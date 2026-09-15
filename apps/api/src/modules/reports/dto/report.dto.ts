@@ -1,4 +1,6 @@
 import { IsEnum, IsString, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
+import * as sanitizeHtml from 'sanitize-html';
 import { ReportTargetType, ReportStatus } from '@repo/shared';
 
 export class CreateReportDto {
@@ -9,6 +11,7 @@ export class CreateReportDto {
   target_id: string;
 
   @IsString()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   reason: string;
 }
 
@@ -18,6 +21,7 @@ export class UpdateReportDto {
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   admin_note?: string;
 }
 

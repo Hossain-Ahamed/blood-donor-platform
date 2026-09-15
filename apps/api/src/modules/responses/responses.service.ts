@@ -18,8 +18,16 @@ export class ResponsesService {
   ) { }
 
   async create(requestId: string, donorId: string): Promise<Response> {
+  async create(requestId: string, donorId: string, message?: string): Promise<Response> {
     const request = await this.requestRepository.findOne({ where: { id: requestId } });
     if (!request) throw new NotFoundException('Request not found');
+    if (!request) {
+      throw new NotFoundException('Request not found');
+    }
+
+    if (request.requester_id === donorId) {
+      throw new BadRequestException('Cannot respond to your own request');
+    }
 
     if (request.status !== RequestStatus.OPEN) {
       throw new BadRequestException('Request is not open for responses');
@@ -37,6 +45,7 @@ export class ResponsesService {
       request_id: requestId,
       donor_id: donorId,
       status: ResponseStatus.OFFERED,
+      message,
     });
 
     return this.responseRepository.save(response);

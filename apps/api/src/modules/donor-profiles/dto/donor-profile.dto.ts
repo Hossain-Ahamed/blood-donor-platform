@@ -1,4 +1,6 @@
 import { IsEnum, IsNumber, IsOptional, IsString, IsDateString, IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
+import * as sanitizeHtml from 'sanitize-html';
 import { BloodGroup } from '@repo/shared';
 
 export class UpsertDonorProfileDto {
@@ -16,6 +18,7 @@ export class UpsertDonorProfileDto {
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   bio?: string;
 
   @IsDateString()
@@ -42,6 +45,7 @@ export class UpdateDonorProfileDto {
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   bio?: string;
 
   @IsDateString()

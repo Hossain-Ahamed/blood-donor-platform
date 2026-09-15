@@ -1,6 +1,7 @@
 import { Controller, Post, Patch, Param, Body } from '@nestjs/common';
 import { ResponsesService } from './responses.service';
 import { UpdateResponseDto } from './dto/response.dto';
+import { CreateResponseDto, UpdateResponseDto } from './dto/response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller()
@@ -11,8 +12,10 @@ export class ResponsesController {
   async create(
     @Param('requestId') requestId: string,
     @CurrentUser() user: any,
+    @Body() dto: CreateResponseDto,
   ) {
     return this.responsesService.create(requestId, user.id);
+    return this.responsesService.create(requestId, user.id, dto.message);
   }
 
   @Patch('responses/:id')

@@ -1,4 +1,6 @@
 import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import * as sanitizeHtml from 'sanitize-html';
 import { BloodGroup, ComponentType, UrgencyLevel } from '@repo/shared';
 
 export class CreateRequestDto {
@@ -28,10 +30,12 @@ export class CreateRequestDto {
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   hospital_name?: string;
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   patient_note?: string;
 
   @IsString()

@@ -4,8 +4,12 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+import helmet from 'helmet';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  app.use(helmet());
 
   // Enable URI versioning
   app.enableVersioning({

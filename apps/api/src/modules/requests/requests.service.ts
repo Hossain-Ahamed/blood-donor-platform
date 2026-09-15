@@ -78,8 +78,17 @@ export class RequestsService {
 
   async findAll(filters: any): Promise<BloodRequest[]> {
     return this.requestRepository.find({
+    const results = await this.requestRepository.find({
       where: filters,
       order: { created_at: "DESC" },
+    });
+    return results.map(r => {
+      delete (r as any).contact_phone;
+      if (r.location && (r.location as any).coordinates) {
+        (r.location as any).coordinates[0] = Math.round((r.location as any).coordinates[0] * 1000) / 1000;
+        (r.location as any).coordinates[1] = Math.round((r.location as any).coordinates[1] * 1000) / 1000;
+      }
+      return r;
     });
   }
 
@@ -111,7 +120,20 @@ export class RequestsService {
 
     const results = await qb.getMany();
     await this.cacheManager.set(cacheKey, results, 60 * 1000); // 1 minute cache
+    
+    // Remove sensitive fields from list responses
+    const sanitizedResults = results.map(r => {
+      delete (r as any).contact_phone;
+      if (r.location && (r.location as any).coordinates) {
+        (r.location as any).coordinates[0] = Math.round((r.location as any).coordinates[0] * 1000) / 1000;
+        (r.location as any).coordinates[1] = Math.round((r.location as any).coordinates[1] * 1000) / 1000;
+      }
+      return r;
+    });
 
     return results;
+    await this.cacheManager.set(cacheKey, sanitizedResults, 60 * 1000); // 1 minute cache
+
+    return sanitizedResults;
   }
 }
