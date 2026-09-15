@@ -47,10 +47,10 @@ export default function AdminDashboardPage() {
         const data = await apiClient.request<{ data: DashboardStats }>(
           "/admin/dashboard/stats",
         );
-        // Check if the backend wraps in { data: ... } or returns directly
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setStats(data as any); // Might need adjusting based on NestJS interceptor
-      } catch (err: any) {
-        setError(err.message || "Failed to load stats");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load stats");
       } finally {
         setLoading(false);
       }
@@ -60,7 +60,7 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
+      <div className="flex items-center justify-center h-full min-h-100">
         <div className="animate-spin text-gray-500">
           <Activity size={32} />
         </div>
@@ -79,6 +79,7 @@ export default function AdminDashboardPage() {
   }
 
   // Handle both possible response shapes (NestJS might wrap in `{ data: ... }`)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeStats = (stats as any).data ? (stats as any).data : stats;
 
   const bloodGroupChartData = Object.entries(
@@ -159,7 +160,7 @@ export default function AdminDashboardPage() {
           <CardHeader>
             <CardTitle>Available Donors by Blood Group</CardTitle>
           </CardHeader>
-          <CardContent className="pl-2 h-[300px]">
+          <CardContent className="pl-2 h-75">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bloodGroupChartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />

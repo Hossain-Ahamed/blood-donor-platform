@@ -16,11 +16,6 @@ import { AdminAuditLogsController } from "./admin-audit-logs.controller";
     AdminDashboardController,
     AdminUsersController,
     AdminRequestsController,
-  ],
-  controllers: [
-    AdminDashboardController,
-    AdminUsersController,
-    AdminRequestsController,
     AdminAuditLogsController,
   ],
   providers: [AdminDashboardService, AdminUsersService, AdminRequestsService],
