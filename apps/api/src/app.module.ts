@@ -4,6 +4,8 @@ import { RequestsModule } from "./modules/requests/requests.module";
 import { ResponsesModule } from "./modules/responses/responses.module";
 import { DonationsModule } from "./modules/donations/donations.module";
 import { ReportsModule } from "./modules/reports/reports.module";
+import { AuditLogsModule } from "./modules/audit-logs/audit-logs.module";
+import { AdminModule } from "./modules/admin/admin.module";
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -46,6 +48,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     ResponsesModule,
     DonationsModule,
     ReportsModule,
+    AuditLogsModule,
+    AdminModule,
   ],
   controllers: [],
   providers: [
