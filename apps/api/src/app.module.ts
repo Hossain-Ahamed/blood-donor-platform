@@ -13,6 +13,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { UsersModule } from './modules/users/users.module';
+import { DonorProfilesModule } from './modules/donor-profiles/donor-profiles.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     RedisModule,
     AuthModule,
     HealthModule,
+    UsersModule,
+    DonorProfilesModule,
   ],
   controllers: [],
   providers: [],
