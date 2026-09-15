@@ -1,13 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { RequestsService } from './requests.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BloodRequest } from '../../entities/request.entity';
-import { PushSubscriptionsService } from '../push-subscriptions/push-subscriptions.service';
-import { DonorProfilesService } from '../donor-profiles/donor-profiles.service';
-import { RequestStatus, BloodGroup } from '@repo/shared';
+import { Test, TestingModule } from "@nestjs/testing";
+import { RequestsService } from "./requests.service";
+import { getRepositoryToken } from "@nestjs/typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { BloodRequest } from "../../entities/request.entity";
+import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
+import { DonorProfilesService } from "../donor-profiles/donor-profiles.service";
+import { RequestStatus, BloodGroup } from "@repo/shared";
 
-describe('RequestsService', () => {
+describe("RequestsService", () => {
   let service: RequestsService;
   let cacheManagerMock: any;
   let queryBuilderMock: any;
@@ -24,7 +24,14 @@ describe('RequestsService', () => {
       andWhere: jest.fn().mockReturnThis(),
       setParameters: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([{ id: 'request-1', location: { type: 'Point', coordinates: [1.2, 3.4] } }]),
+      getMany: jest
+        .fn()
+        .mockResolvedValue([
+          {
+            id: "request-1",
+            location: { type: "Point", coordinates: [1.2, 3.4] },
+          },
+        ]),
     };
 
     requestRepositoryMock = {
@@ -56,33 +63,59 @@ describe('RequestsService', () => {
     service = module.get<RequestsService>(RequestsService);
   });
 
-  describe('findNearby', () => {
-    it('should return cached results if available', async () => {
-      const cachedData = [{ id: 'cached-request' }];
+  describe("findNearby", () => {
+    it("should return cached results if available", async () => {
+      const cachedData = [{ id: "cached-request" }];
       cacheManagerMock.get.mockResolvedValue(cachedData);
 
-      const result = await service.findNearby({ lat: 10, lng: 20, radiusKm: 5 });
+      const result = await service.findNearby({
+        lat: 10,
+        lng: 20,
+        radiusKm: 5,
+      });
 
       expect(result).toEqual(cachedData);
       expect(cacheManagerMock.get).toHaveBeenCalled();
       expect(requestRepositoryMock.createQueryBuilder).not.toHaveBeenCalled();
     });
 
-    it('should query database if cache is empty', async () => {
+    it("should query database if cache is empty", async () => {
       cacheManagerMock.get.mockResolvedValue(null);
 
-      const result = await service.findNearby({ lat: 10, lng: 20, radiusKm: 5, bloodGroup: BloodGroup.A_POS });
+      const result = await service.findNearby({
+        lat: 10,
+        lng: 20,
+        radiusKm: 5,
+        bloodGroup: BloodGroup.A_POS,
+      });
 
-      expect(requestRepositoryMock.createQueryBuilder).toHaveBeenCalledWith('request');
-      expect(queryBuilderMock.where).toHaveBeenCalledWith('request.status = :status', { status: RequestStatus.OPEN });
-      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
-        `ST_DWithin(request.location, ST_MakePoint(:lng, :lat)::geography, :radiusMeters)`
+      expect(requestRepositoryMock.createQueryBuilder).toHaveBeenCalledWith(
+        "request",
       );
-      expect(queryBuilderMock.setParameters).toHaveBeenCalledWith({ lat: 10, lng: 20, radiusMeters: 5000 });
-      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith('request.blood_group = :bg', { bg: BloodGroup.A_POS });
-      
+      expect(queryBuilderMock.where).toHaveBeenCalledWith(
+        "request.status = :status",
+        { status: RequestStatus.OPEN },
+      );
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        `ST_DWithin(request.location, ST_MakePoint(:lng, :lat)::geography, :radiusMeters)`,
+      );
+      expect(queryBuilderMock.setParameters).toHaveBeenCalledWith({
+        lat: 10,
+        lng: 20,
+        radiusMeters: 5000,
+      });
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        "request.blood_group = :bg",
+        { bg: BloodGroup.A_POS },
+      );
+
       // Sanitized results check
-      expect(result).toEqual([{ id: 'request-1', location: { type: 'Point', coordinates: [1.2, 3.4] } }]);
+      expect(result).toEqual([
+        {
+          id: "request-1",
+          location: { type: "Point", coordinates: [1.2, 3.4] },
+        },
+      ]);
       expect(cacheManagerMock.set).toHaveBeenCalled();
     });
   });
