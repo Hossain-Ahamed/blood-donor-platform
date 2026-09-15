@@ -1,7 +1,13 @@
-'use client';
-import { useFormContext } from 'react-hook-form';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from './form';
-import { Input } from './input';
+"use client";
+import { useFormContext } from "react-hook-form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "./form";
+import { Input } from "./input";
 
 interface FormInputProps {
   name: string;
@@ -10,9 +16,14 @@ interface FormInputProps {
   placeholder?: string;
 }
 
-export function FormInput({ name, label, type = 'text', placeholder }: FormInputProps) {
+export function FormInput({
+  name,
+  label,
+  type = "text",
+  placeholder,
+}: FormInputProps) {
   const { control } = useFormContext();
-  
+
   return (
     <FormField
       control={control}

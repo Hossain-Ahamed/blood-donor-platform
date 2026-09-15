@@ -1,9 +1,9 @@
 import { IsEnum, IsString, IsOptional } from 'class-validator';
-import { TargetType, ReportStatus } from '@repo/shared';
+import { ReportTargetType, ReportStatus } from '@repo/shared';
 
 export class CreateReportDto {
-  @IsEnum(TargetType)
-  target_type: TargetType;
+  @IsEnum(ReportTargetType)
+  target_type: ReportTargetType;
 
   @IsString()
   target_id: string;
@@ -20,3 +20,4 @@ export class UpdateReportDto {
   @IsOptional()
   admin_note?: string;
 }
+

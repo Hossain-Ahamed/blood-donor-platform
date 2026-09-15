@@ -1,6 +1,6 @@
-'use client';
-import { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient } from '../lib/api/client';
+"use client";
+import { createContext, useContext, useState, useEffect } from "react";
+import { apiClient } from "../lib/api/client";
 
 type User = {
   id: string;
@@ -29,7 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient.request<{ success: boolean; data: User }>('/users/me')
+    apiClient
+      .request<{ success: boolean; data: User }>("/users/me")
       .then((res) => {
         // Mock response unpack since Nest returns raw user object
         setUser(res as any);
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     apiClient.clearTokens();
     setUser(null);
-    window.location.href = '/';
+    window.location.href = "/";
   };
 
   return (

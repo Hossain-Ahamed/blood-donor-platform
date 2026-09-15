@@ -5,11 +5,12 @@ export class RolesGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    
+
     if (!user || user.role !== 'ADMIN') {
       throw new ForbiddenException('Admin role required');
     }
-    
+
     return true;
   }
 }
+

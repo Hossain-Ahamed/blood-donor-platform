@@ -65,8 +65,7 @@ export class ResponsesService {
     // If accepted, auto-create donation and update request
     if (status === ResponseStatus.ACCEPTED) {
       const donation = this.donationRepository.create({
-        request_id: response.request_id,
-        donor_id: response.donor_id,
+        response_id: response.id,
         donation_date: new Date(),
       });
       await this.donationRepository.save(donation);

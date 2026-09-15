@@ -11,7 +11,7 @@ export class DonorAvailabilityCron {
   constructor(
     @InjectRepository(DonorProfile)
     private readonly donorProfileRepository: Repository<DonorProfile>,
-  ) {}
+  ) { }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleCron() {
@@ -30,3 +30,4 @@ export class DonorAvailabilityCron {
     this.logger.log(`Recomputed availability for ${result.affected} donors.`);
   }
 }
+

@@ -10,7 +10,7 @@ export class ReportsService {
   constructor(
     @InjectRepository(Report)
     private readonly reportRepository: Repository<Report>,
-  ) {}
+  ) { }
 
   async create(userId: string, dto: CreateReportDto): Promise<Report> {
     const report = this.reportRepository.create({
@@ -30,10 +30,9 @@ export class ReportsService {
   async update(id: string, dto: UpdateReportDto): Promise<Report> {
     const report = await this.reportRepository.findOne({ where: { id } });
     if (!report) throw new NotFoundException('Report not found');
-    
+
     report.status = dto.status;
-    if (dto.admin_note) report.admin_note = dto.admin_note;
-    
+
     return this.reportRepository.save(report);
   }
 }

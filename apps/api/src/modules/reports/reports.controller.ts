@@ -6,7 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly reportsService: ReportsService) { }
 
   @Post()
   async create(@CurrentUser() user: any, @Body() dto: CreateReportDto) {

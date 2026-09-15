@@ -18,8 +18,8 @@ export class DonationsService {
 
   async getMyDonations(userId: string): Promise<Donation[]> {
     return this.donationRepository.find({
-      where: { donor_id: userId },
-      relations: ['request'],
+      where: { response: { donor_id: userId } },
+      relations: ['response', 'response.request'],
       order: { created_at: 'DESC' },
     });
   }
@@ -27,29 +27,29 @@ export class DonationsService {
   async confirm(donationId: string, userId: string, confirmed: boolean): Promise<Donation> {
     const donation = await this.donationRepository.findOne({
       where: { id: donationId },
-      relations: ['request'],
+      relations: ['response', 'response.request'],
     });
 
     if (!donation) throw new NotFoundException('Donation not found');
 
-    const isDonor = donation.donor_id === userId;
-    const isRequester = donation.request.requester_id === userId;
+    const isDonor = donation.response.donor_id === userId;
+    const isRequester = donation.response.request.requester_id === userId;
 
     if (!isDonor && !isRequester) {
       throw new ForbiddenException('You are not authorized to confirm this donation');
     }
 
     if (isDonor) {
-      donation.donor_confirmed = confirmed;
+      donation.confirmed_by_donor = confirmed;
     } else {
-      donation.requester_confirmed = confirmed;
+      donation.confirmed_by_requester = confirmed;
     }
 
     const updated = await this.donationRepository.save(donation);
 
     // If both confirmed, update donor profile
-    if (updated.donor_confirmed && updated.requester_confirmed) {
-      const profile = await this.donorProfileRepository.findOne({ where: { user_id: donation.donor_id } });
+    if (updated.confirmed_by_donor && updated.confirmed_by_requester) {
+      const profile = await this.donorProfileRepository.findOne({ where: { user_id: donation.response.donor_id } });
       if (profile) {
         profile.last_donation_date = updated.donation_date;
         profile.is_available = false; // Immediate trigger
