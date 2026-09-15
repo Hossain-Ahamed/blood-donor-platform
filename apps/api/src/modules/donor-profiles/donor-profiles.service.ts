@@ -10,7 +10,7 @@ export class DonorProfilesService {
   constructor(
     @InjectRepository(DonorProfile)
     private readonly donorProfileRepository: Repository<DonorProfile>,
-  ) {}
+  ) { }
 
   private calculateAvailability(lastDonationDate: string | Date | undefined): boolean {
     if (!lastDonationDate) return true;
@@ -30,7 +30,7 @@ export class DonorProfilesService {
 
   async upsert(userId: string, dto: UpsertDonorProfileDto): Promise<DonorProfile> {
     let profile = await this.donorProfileRepository.findOne({ where: { user_id: userId } });
-    
+
     const location: Point = {
       type: 'Point',
       coordinates: [dto.lng, dto.lat],

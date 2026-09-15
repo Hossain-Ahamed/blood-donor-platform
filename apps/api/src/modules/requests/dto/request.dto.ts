@@ -1,5 +1,5 @@
-import { IsEnum, IsNumber, IsOptional, IsString, IsPhoneNumber, Min } from 'class-validator';
-import { BloodGroup, ComponentType, UrgencyLevel, RequestStatus } from '@repo/shared';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { BloodGroup, ComponentType, UrgencyLevel } from '@repo/shared';
 
 export class CreateRequestDto {
   @IsEnum(BloodGroup)
@@ -52,3 +52,4 @@ export class NearbyQueryDto {
   @IsOptional()
   bloodGroup?: BloodGroup;
 }
+

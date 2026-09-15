@@ -9,7 +9,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   async getMe(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id: userId } });

@@ -1,7 +1,14 @@
+import { UsersModule } from "./modules/users/users.module";
+import { DonorProfilesModule } from "./modules/donor-profiles/donor-profiles.module";
+import { RequestsModule } from "./modules/requests/requests.module";
+import { ResponsesModule } from "./modules/responses/responses.module";
+import { DonationsModule } from "./modules/donations/donations.module";
+import { ReportsModule } from "./modules/reports/reports.module";
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { validateEnv } from './config/env.validation';
 import { dataSourceOptions } from './config/typeorm.config';
@@ -34,6 +41,7 @@ import { ReportsModule } from './modules/reports/reports.module';
         limit: config.get<number>('RATE_LIMIT_MAX', 60),
       }],
     }),
+    ScheduleModule.forRoot(),
     CommonModule,
     RedisModule,
     AuthModule,
@@ -47,7 +55,7 @@ import { ReportsModule } from './modules/reports/reports.module';
   ],
   controllers: [],
   providers: [
-    
+
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -59,4 +67,4 @@ import { ReportsModule } from './modules/reports/reports.module';
   ],
 })
 
-export class AppModule {}
+export class AppModule { }

@@ -52,3 +52,4 @@ export class UpdateDonorProfileDto {
   @IsOptional()
   is_available?: boolean;
 }
+

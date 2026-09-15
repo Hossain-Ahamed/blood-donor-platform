@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -14,7 +14,7 @@ export class RequestsService {
     @InjectRepository(BloodRequest)
     private readonly requestRepository: Repository<BloodRequest>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+  ) { }
 
   async create(userId: string, dto: CreateRequestDto): Promise<BloodRequest> {
     const location: Point = {
@@ -63,7 +63,7 @@ export class RequestsService {
     // Use PostGIS ST_DWithin
     // 1 degree is approx 111km, but ST_DWithin on geography uses meters
     const radiusMeters = query.radiusKm * 1000;
-    
+
     let qb = this.requestRepository.createQueryBuilder('request')
       .where('request.status = :status', { status: RequestStatus.OPEN })
       .andWhere(`ST_DWithin(request.location, ST_MakePoint(:lng, :lat)::geography, :radiusMeters)`)
@@ -77,7 +77,7 @@ export class RequestsService {
 
     const results = await qb.getMany();
     await this.cacheManager.set(cacheKey, results, 60 * 1000); // 1 minute cache
-    
+
     return results;
   }
 }

@@ -5,7 +5,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('donor-profiles')
 export class DonorProfilesController {
-  constructor(private readonly donorProfilesService: DonorProfilesService) {}
+  constructor(private readonly donorProfilesService: DonorProfilesService) { }
 
   @Post()
   async upsert(@CurrentUser() user: any, @Body() dto: UpsertDonorProfileDto) {

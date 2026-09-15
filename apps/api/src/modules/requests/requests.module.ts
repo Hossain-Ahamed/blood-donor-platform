@@ -10,4 +10,4 @@ import { BloodRequest } from '../../entities/request.entity';
   providers: [RequestsService],
   exports: [RequestsService],
 })
-export class RequestsModule {}
+export class RequestsModule { }
