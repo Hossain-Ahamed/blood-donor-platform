@@ -1,9 +1,10 @@
 {
-  "name": "blood-donor-platform",
+  "name": "blood",
   "private": true,
   "scripts": {
-    "lint": "eslint .",
-    "format": "prettier --write ."
+    "dev": "pnpm --parallel -r run dev",
+    "build": "pnpm -r run build",
+    "start": "pnpm -r run start"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
@@ -11,4 +12,3 @@
     "typescript": "^5.4.2"
   }
 }
-
