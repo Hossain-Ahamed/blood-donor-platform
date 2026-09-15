@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.next
+coverage
+.turbo
+DATABSE.md
+PROJECT_PLAN.md
+
