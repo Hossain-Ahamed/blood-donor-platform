@@ -1,11 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { validateEnv } from './config/env.validation';
 import { dataSourceOptions } from './config/typeorm.config';
 import { CommonModule } from './common/common.module';
@@ -15,6 +12,10 @@ import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { UsersModule } from './modules/users/users.module';
 import { DonorProfilesModule } from './modules/donor-profiles/donor-profiles.module';
+import { RequestsModule } from './modules/requests/requests.module';
+import { ResponsesModule } from './modules/responses/responses.module';
+import { DonationsModule } from './modules/donations/donations.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -39,12 +40,14 @@ import { DonorProfilesModule } from './modules/donor-profiles/donor-profiles.mod
     HealthModule,
     UsersModule,
     DonorProfilesModule,
+    RequestsModule,
+    ResponsesModule,
+    DonationsModule,
+    ReportsModule,
   ],
   controllers: [],
-  providers: [],
-  controllers: [AppController],
   providers: [
-    AppService,
+    
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -55,6 +58,5 @@ import { DonorProfilesModule } from './modules/donor-profiles/donor-profiles.mod
     }
   ],
 })
-export class AppModule { }
 
 export class AppModule {}
