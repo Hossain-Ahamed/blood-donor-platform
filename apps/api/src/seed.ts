@@ -21,9 +21,9 @@ async function seed() {
   // 1. Create a Fake User & Donor
   const user1 = userRepository.create({
     google_id: 'fake-google-id-1',
-    email: 'donor1@example.com',
+    email: 'ahamed.hossain@rpsu.edu.bd',
     name: 'Rahim Uddin',
-    role: UserRole.USER,
+    role: UserRole.ADMIN,
     is_active: true,
   });
   await userRepository.save(user1);
@@ -46,7 +46,7 @@ async function seed() {
     google_id: 'fake-google-id-2',
     email: 'requester1@example.com',
     name: 'Karim Hasan',
-    role: UserRole.USER,
+    role: UserRole.ADMIN,
     is_active: true,
   });
   await userRepository.save(user2);

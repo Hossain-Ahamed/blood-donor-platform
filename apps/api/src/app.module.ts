@@ -36,7 +36,7 @@ import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
       useFactory: (config: ConfigService) => [
         {
           ttl: config.get<number>("RATE_LIMIT_TTL", 60000),
-          limit: config.get<number>("RATE_LIMIT_MAX", 60),
+          limit: config.get<number>("RATE_LIMIT_MAX", 1000), // Increased to tolerate SSR requests from the same Next.js node
         },
       ],
     }),

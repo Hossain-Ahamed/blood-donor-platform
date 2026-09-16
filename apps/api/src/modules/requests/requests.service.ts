@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
@@ -13,6 +13,8 @@ import { DonorProfilesService } from "../donor-profiles/donor-profiles.service";
 
 @Injectable()
 export class RequestsService {
+  private readonly logger = new Logger(RequestsService.name);
+
   constructor(
     @InjectRepository(BloodRequest)
     private readonly requestRepository: Repository<BloodRequest>,
@@ -39,6 +41,10 @@ export class RequestsService {
       location,
       area_name: dto.area_name,
       hospital_name: dto.hospital_name,
+      patient_name: dto.patient_name,
+      patient_age: dto.patient_age,
+      disease: dto.disease,
+      needed_time: dto.needed_time ? new Date(dto.needed_time) : undefined,
       patient_note: dto.patient_note,
       contact_phone: dto.contact_phone,
       expires_at: expiresAt,
@@ -83,7 +89,11 @@ export class RequestsService {
     });
     return results.map((r) => {
       delete (r as any).contact_phone;
-      if (r.location && (r.location as any).coordinates) {
+      if (
+        r.location &&
+        Array.isArray((r.location as any).coordinates) &&
+        (r.location as any).coordinates.length >= 2
+      ) {
         (r.location as any).coordinates[0] =
           Math.round((r.location as any).coordinates[0] * 1000) / 1000;
         (r.location as any).coordinates[1] =
@@ -93,48 +103,104 @@ export class RequestsService {
     });
   }
 
-  async findNearby(query: NearbyQueryDto) {
-    const cacheKey = `requests:nearby:${query.lat.toFixed(2)}:${query.lng.toFixed(2)}:${query.radiusKm}:${query.bloodGroup || "all"}`;
-    const cached = await this.cacheManager.get(cacheKey);
-    if (cached) return cached;
+  async findNearby(query: any) {
+    this.logger.log(`findNearby called with: ${JSON.stringify(query)}`);
+    const lat =
+      typeof query.lat === "number"
+        ? query.lat
+        : parseFloat(query.lat) || 23.7925;
+    const lng =
+      typeof query.lng === "number"
+        ? query.lng
+        : parseFloat(query.lng) || 90.4078;
+    const rawRadius =
+      typeof query.radiusKm === "number"
+        ? query.radiusKm
+        : parseFloat(query.radiusKm) || 10;
+    // Cap radius at 200 km
+    const radiusKm = Math.min(200, Math.max(1, rawRadius));
+    const bloodGroup =
+      query.bloodGroup &&
+      query.bloodGroup !== "ALL" &&
+      query.bloodGroup !== "all"
+        ? query.bloodGroup
+        : undefined;
 
-    // Use PostGIS ST_DWithin
-    // 1 degree is approx 111km, but ST_DWithin on geography uses meters
-    const radiusMeters = query.radiusKm * 1000;
-
-    let qb = this.requestRepository
-      .createQueryBuilder("request")
-      .where("request.status = :status", { status: RequestStatus.OPEN })
-      .andWhere(
-        `ST_DWithin(request.location, ST_MakePoint(:lng, :lat)::geography, :radiusMeters)`,
-      )
-      .setParameters({ lng: query.lng, lat: query.lat, radiusMeters });
-
-    if (query.bloodGroup) {
-      qb = qb.andWhere("request.blood_group = :bg", { bg: query.bloodGroup });
+    const cacheKey = `requests:nearby:${lat.toFixed(2)}:${lng.toFixed(2)}:${radiusKm}:${bloodGroup || "all"}`;
+    try {
+      if (this.cacheManager) {
+        const cached = await this.cacheManager.get(cacheKey);
+        if (cached) return cached;
+      }
+    } catch (cacheErr) {
+      this.logger.warn(`Cache get failed: ${cacheErr}`);
     }
 
-    qb = qb.orderBy(
-      `ST_Distance(request.location, ST_MakePoint(:lng, :lat)::geography)`,
-      "ASC",
-    );
+    try {
+      // Use PostGIS ST_DWithin
+      const radiusMeters = radiusKm * 1000;
 
-    const results = await qb.getMany();
+      let qb = this.requestRepository
+        .createQueryBuilder("request")
+        .where("request.status = :status", { status: RequestStatus.OPEN })
+        .andWhere(
+          `ST_DWithin(request.location, ST_MakePoint(:lng, :lat)::geography, :radiusMeters)`,
+        )
+        .setParameters({ lng, lat, radiusMeters });
 
-    // Remove sensitive fields from list responses
-    const sanitizedResults = results.map((r) => {
-      delete (r as any).contact_phone;
-      if (r.location && (r.location as any).coordinates) {
-        (r.location as any).coordinates[0] =
-          Math.round((r.location as any).coordinates[0] * 1000) / 1000;
-        (r.location as any).coordinates[1] =
-          Math.round((r.location as any).coordinates[1] * 1000) / 1000;
+      if (bloodGroup) {
+        qb = qb.andWhere("request.blood_group = :bg", { bg: bloodGroup });
       }
-      return r;
-    });
 
-    await this.cacheManager.set(cacheKey, sanitizedResults, 60 * 1000); // 1 minute cache
+      qb.addSelect(
+        `ST_Distance(request.location, ST_MakePoint(:lng, :lat)::geography)`,
+        "dist",
+      );
+      qb.orderBy("dist", "ASC");
 
-    return sanitizedResults;
+      const results = await qb.getMany();
+
+      // Remove sensitive fields from list responses
+      const sanitizedResults = results.map((r) => {
+        delete (r as any).contact_phone;
+        if (
+          r.location &&
+          Array.isArray((r.location as any).coordinates) &&
+          (r.location as any).coordinates.length >= 2
+        ) {
+          (r.location as any).coordinates[0] =
+            Math.round((r.location as any).coordinates[0] * 10000) / 10000;
+          (r.location as any).coordinates[1] =
+            Math.round((r.location as any).coordinates[1] * 10000) / 10000;
+        }
+        return r;
+      });
+
+      try {
+        if (this.cacheManager) {
+          await this.cacheManager.set(cacheKey, sanitizedResults, 60 * 1000);
+        }
+      } catch (cacheErr) {
+        this.logger.warn(`Cache set failed: ${cacheErr}`);
+      }
+
+      return sanitizedResults;
+    } catch (err: any) {
+      this.logger.error(`Spatial query failed, falling back: ${err.message}`, err.stack);
+      
+      const fallbackResults = await this.requestRepository.find({
+        where: {
+          status: RequestStatus.OPEN,
+          ...(bloodGroup ? { blood_group: bloodGroup as any } : {}),
+        },
+        order: { created_at: "DESC" },
+        take: 50,
+      });
+
+      return fallbackResults.map((r) => {
+        delete (r as any).contact_phone;
+        return r;
+      });
+    }
   }
 }

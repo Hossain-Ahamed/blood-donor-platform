@@ -4,6 +4,11 @@ import * as sanitizeHtml from 'sanitize-html';
 import { BloodGroup } from '@repo/shared';
 
 export class UpsertDonorProfileDto {
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  name?: string;
+
   @IsEnum(BloodGroup)
   blood_group: BloodGroup;
 
@@ -16,6 +21,24 @@ export class UpsertDonorProfileDto {
   @IsString()
   area_name: string;
 
+  @IsDateString()
+  @IsOptional()
+  date_of_birth?: string;
+
+  @IsNumber()
+  @IsOptional()
+  age?: number;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  religion?: string;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  health_notes?: string;
+
   @IsString()
   @IsOptional()
   @Transform(({ value }) => value ? sanitizeHtml(value) : value)
@@ -27,6 +50,11 @@ export class UpsertDonorProfileDto {
 }
 
 export class UpdateDonorProfileDto {
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  name?: string;
+
   @IsEnum(BloodGroup)
   @IsOptional()
   blood_group?: BloodGroup;
@@ -43,6 +71,24 @@ export class UpdateDonorProfileDto {
   @IsOptional()
   area_name?: string;
 
+  @IsDateString()
+  @IsOptional()
+  date_of_birth?: string;
+
+  @IsNumber()
+  @IsOptional()
+  age?: number;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  religion?: string;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  health_notes?: string;
+
   @IsString()
   @IsOptional()
   @Transform(({ value }) => value ? sanitizeHtml(value) : value)
@@ -56,4 +102,3 @@ export class UpdateDonorProfileDto {
   @IsOptional()
   is_available?: boolean;
 }
-

@@ -1,18 +1,18 @@
 import { ImageResponse } from "next/og";
 
 // Route segment config
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 // Image metadata
 export const contentType = "image/png";
 
 // Generate dynamic icon sizes for PWA based on query params
 export default function Icon({
-  searchParams,
+  searchParams = {},
 }: {
-  searchParams: { size?: string };
+  searchParams?: { size?: string };
 }) {
-  const size = searchParams.size ? parseInt(searchParams.size, 10) : 192;
+  const size = searchParams?.size ? parseInt(searchParams.size, 10) : 192;
 
   return new ImageResponse(
     <div

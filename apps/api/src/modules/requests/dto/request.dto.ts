@@ -1,5 +1,5 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsEnum, IsNumber, IsOptional, IsString, IsDateString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import * as sanitizeHtml from 'sanitize-html';
 import { BloodGroup, ComponentType, UrgencyLevel } from '@repo/shared';
 
@@ -36,6 +36,24 @@ export class CreateRequestDto {
   @IsString()
   @IsOptional()
   @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  patient_name?: string;
+
+  @IsNumber()
+  @IsOptional()
+  patient_age?: number;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  disease?: string;
+
+  @IsDateString()
+  @IsOptional()
+  needed_time?: string;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   patient_note?: string;
 
   @IsString()
@@ -43,17 +61,22 @@ export class CreateRequestDto {
 }
 
 export class NearbyQueryDto {
+  @Type(() => Number)
   @IsNumber()
-  lat: number;
-
-  @IsNumber()
-  lng: number;
-
-  @IsNumber()
-  radiusKm: number;
-
-  @IsEnum(BloodGroup)
   @IsOptional()
-  bloodGroup?: BloodGroup;
-}
+  lat?: number;
 
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  lng?: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  radiusKm?: number;
+
+  @IsString()
+  @IsOptional()
+  bloodGroup?: string;
+}

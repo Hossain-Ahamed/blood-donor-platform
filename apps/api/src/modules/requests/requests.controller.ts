@@ -3,6 +3,7 @@ import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { RequestsService } from './requests.service';
 import { CreateRequestDto, NearbyQueryDto } from './dto/request.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('requests')
 export class RequestsController {
@@ -15,17 +16,13 @@ export class RequestsController {
     return this.requestsService.create(user.id, dto);
   }
 
+  @Public()
   @Get('nearby')
   async findNearby(@Query() query: NearbyQueryDto) {
-    // Manually parse strings from query params
-    return this.requestsService.findNearby({
-      lat: parseFloat(query.lat as any),
-      lng: parseFloat(query.lng as any),
-      radiusKm: parseFloat(query.radiusKm as any),
-      bloodGroup: query.bloodGroup,
-    });
+    return this.requestsService.findNearby(query);
   }
 
+  @Public()
   @Get()
   async findAll(@Query() query: any) {
     const filters = {};
@@ -34,6 +31,7 @@ export class RequestsController {
     return this.requestsService.findAll(filters);
   }
 
+  @Public()
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.requestsService.findOne(id);

@@ -54,6 +54,18 @@ export class BloodRequest {
   @Column({ nullable: true })
   hospital_name: string;
 
+  @Column({ nullable: true })
+  patient_name: string;
+
+  @Column({ type: 'smallint', nullable: true })
+  patient_age: number;
+
+  @Column({ nullable: true })
+  disease: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  needed_time: Date;
+
   @Column({ type: 'text', nullable: true })
   patient_note: string;
 

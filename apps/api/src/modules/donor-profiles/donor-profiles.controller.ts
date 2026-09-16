@@ -1,42 +1,51 @@
-import { Controller, Get, Post, Patch, Body } from '@nestjs/common';
-import { Controller, Get, Post, Patch, Body, Query } from '@nestjs/common';
-import { DonorProfilesService } from './donor-profiles.service';
-import { UpsertDonorProfileDto, UpdateDonorProfileDto } from './dto/donor-profile.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Controller, Get, Post, Patch, Body, Query } from "@nestjs/common";
+import { DonorProfilesService } from "./donor-profiles.service";
+import {
+  UpsertDonorProfileDto,
+  UpdateDonorProfileDto,
+} from "./dto/donor-profile.dto";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
 
-@Controller('donor-profiles')
+@Controller("donor-profiles")
 export class DonorProfilesController {
-  constructor(private readonly donorProfilesService: DonorProfilesService) { }
+  constructor(private readonly donorProfilesService: DonorProfilesService) {}
 
   @Post()
   async upsert(@CurrentUser() user: any, @Body() dto: UpsertDonorProfileDto) {
     return this.donorProfilesService.upsert(user.id, dto);
   }
 
-  @Get('me')
+  @Get("me")
   async getMe(@CurrentUser() user: any) {
     return this.donorProfilesService.getMe(user.id);
   }
 
-  @Patch('me')
+  @Patch("me")
   async updateMe(@CurrentUser() user: any, @Body() dto: UpdateDonorProfileDto) {
     return this.donorProfilesService.updateMe(user.id, dto);
   }
 
-  @Get('nearby')
+  @Get("nearby")
   async findNearby(@Query() query: any) {
     const lat = parseFloat(query.lat);
     const lng = parseFloat(query.lng);
     const radiusKm = parseFloat(query.radiusKm);
-    const profiles = await this.donorProfilesService.findNearby(lat, lng, radiusKm, query.bloodGroup);
-    
-    return profiles.map(p => {
-      // Return a fuzzed location or just omit exact coordinates if needed, 
+    const profiles = await this.donorProfilesService.findNearby(
+      lat,
+      lng,
+      radiusKm,
+      query.bloodGroup,
+    );
+
+    return profiles.map((p) => {
+      // Return a fuzzed location or just omit exact coordinates if needed,
       // but for map markers to work we usually need some coords.
       // We will slightly fuzz it by rounding to 3 decimal places (~100m)
       if (p.location && p.location.coordinates) {
-        p.location.coordinates[0] = Math.round(p.location.coordinates[0] * 1000) / 1000;
-        p.location.coordinates[1] = Math.round(p.location.coordinates[1] * 1000) / 1000;
+        p.location.coordinates[0] =
+          Math.round(p.location.coordinates[0] * 1000) / 1000;
+        p.location.coordinates[1] =
+          Math.round(p.location.coordinates[1] * 1000) / 1000;
       }
       return p;
     });

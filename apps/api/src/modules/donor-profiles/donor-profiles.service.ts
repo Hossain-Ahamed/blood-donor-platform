@@ -2,18 +2,34 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { DonorProfile } from "../../entities/donor-profile.entity";
+import { User } from "../../entities/user.entity";
 import {
   UpsertDonorProfileDto,
   UpdateDonorProfileDto,
 } from "./dto/donor-profile.dto";
 import { Point } from "geojson";
 
+export function calculateAge(dob: string | Date | null | undefined): number | null {
+  if (!dob) return null;
+  const birthDate = new Date(dob);
+  if (isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age >= 0 ? age : null;
+}
+
 @Injectable()
 export class DonorProfilesService {
   constructor(
     @InjectRepository(DonorProfile)
     private readonly donorProfileRepository: Repository<DonorProfile>,
-  ) {}
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) { }
 
   private calculateAvailability(
     lastDonationDate: string | Date | undefined,
@@ -28,9 +44,13 @@ export class DonorProfilesService {
   async getMe(userId: string): Promise<DonorProfile> {
     const profile = await this.donorProfileRepository.findOne({
       where: { user_id: userId },
+      relations: ["user"],
     });
     if (!profile) {
       throw new NotFoundException("Donor profile not found");
+    }
+    if (profile.date_of_birth) {
+      profile.age = calculateAge(profile.date_of_birth) ?? profile.age;
     }
     return profile;
   }
@@ -39,8 +59,13 @@ export class DonorProfilesService {
     userId: string,
     dto: UpsertDonorProfileDto,
   ): Promise<DonorProfile> {
+    if (dto.name) {
+      await this.userRepository.update(userId, { name: dto.name });
+    }
+
     let profile = await this.donorProfileRepository.findOne({
       where: { user_id: userId },
+      relations: ["user"],
     });
 
     const location: Point = {
@@ -49,11 +74,17 @@ export class DonorProfilesService {
     };
 
     const isAvailable = this.calculateAvailability(dto.last_donation_date);
+    const dob = dto.date_of_birth ? new Date(dto.date_of_birth) : undefined;
+    const computedAge = dob ? calculateAge(dob) ?? dto.age : dto.age;
 
     if (profile) {
       profile.blood_group = dto.blood_group;
       profile.location = location;
       profile.area_name = dto.area_name;
+      if (dob !== undefined) profile.date_of_birth = dob;
+      if (computedAge !== undefined) profile.age = computedAge;
+      if (dto.religion !== undefined) profile.religion = dto.religion;
+      if (dto.health_notes !== undefined) profile.health_notes = dto.health_notes;
       if (dto.bio !== undefined) profile.bio = dto.bio;
       if (dto.last_donation_date !== undefined) {
         profile.last_donation_date = new Date(dto.last_donation_date);
@@ -65,6 +96,10 @@ export class DonorProfilesService {
         blood_group: dto.blood_group,
         location,
         area_name: dto.area_name,
+        date_of_birth: dob,
+        age: computedAge,
+        religion: dto.religion,
+        health_notes: dto.health_notes,
         bio: dto.bio,
         last_donation_date: dto.last_donation_date
           ? new Date(dto.last_donation_date)
@@ -73,17 +108,33 @@ export class DonorProfilesService {
       });
     }
 
-    return this.donorProfileRepository.save(profile);
+    const saved = await this.donorProfileRepository.save(profile);
+    if (saved.date_of_birth) {
+      saved.age = calculateAge(saved.date_of_birth) ?? saved.age;
+    }
+    return saved;
   }
 
   async updateMe(
     userId: string,
     dto: UpdateDonorProfileDto,
   ): Promise<DonorProfile> {
+    if (dto.name) {
+      await this.userRepository.update(userId, { name: dto.name });
+    }
+
     const profile = await this.getMe(userId);
 
     if (dto.blood_group) profile.blood_group = dto.blood_group;
     if (dto.area_name) profile.area_name = dto.area_name;
+    if (dto.date_of_birth !== undefined) {
+      profile.date_of_birth = dto.date_of_birth ? new Date(dto.date_of_birth) : (null as any);
+      profile.age = calculateAge(profile.date_of_birth) ?? profile.age;
+    } else if (dto.age !== undefined) {
+      profile.age = dto.age;
+    }
+    if (dto.religion !== undefined) profile.religion = dto.religion;
+    if (dto.health_notes !== undefined) profile.health_notes = dto.health_notes;
     if (dto.bio !== undefined) profile.bio = dto.bio;
     if (dto.lat !== undefined && dto.lng !== undefined) {
       profile.location = {
@@ -101,7 +152,11 @@ export class DonorProfilesService {
       profile.is_available = dto.is_available;
     }
 
-    return this.donorProfileRepository.save(profile);
+    const saved = await this.donorProfileRepository.save(profile);
+    if (saved.date_of_birth) {
+      saved.age = calculateAge(saved.date_of_birth) ?? saved.age;
+    }
+    return saved;
   }
 
   async findNearby(
@@ -124,11 +179,18 @@ export class DonorProfilesService {
       qb = qb.andWhere("donor.blood_group = :bg", { bg: bloodGroup });
     }
 
-    qb = qb.orderBy(
+    qb = qb.addSelect(
       `ST_Distance(donor.location, ST_MakePoint(:lng, :lat)::geography)`,
-      "ASC",
+      "dist",
     );
+    qb = qb.orderBy("dist", "ASC");
 
-    return qb.getMany();
+    const list = await qb.getMany();
+    return list.map((d) => {
+      if (d.date_of_birth) {
+        d.age = calculateAge(d.date_of_birth) ?? d.age;
+      }
+      return d;
+    });
   }
 }

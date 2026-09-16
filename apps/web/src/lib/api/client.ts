@@ -1,56 +1,44 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/v1';
-
 export class ApiError extends Error {
-  constructor(public status: number, public data: any) {
-    super(data?.error || 'API Error');
+  constructor(public status: number, public data: unknown) {
+    super(ApiError.extractMessage(data));
+  }
+
+  private static extractMessage(data: unknown): string {
+    if (!data || typeof data !== 'object') return 'API Error';
+
+    const d = data as Record<string, unknown>;
+    if (typeof d.message === 'string') return d.message;
+    if (Array.isArray(d.message) && d.message.length > 0) return String(d.message[0]);
+    if (typeof d.error === 'string') return d.error;
+
+    try {
+      return JSON.stringify(d);
+    } catch {
+      return 'API Error';
+    }
   }
 }
 
 export const apiClient = {
-  async getTokens() {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('access_token');
-  },
-
-  async setTokens(token: string) {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('access_token', token);
-  },
-
-  async clearTokens() {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('access_token');
-  },
-
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = await this.getTokens();
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `/api/proxy${cleanEndpoint}`;
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...((options.headers as any) || {}),
+      ...((options.headers as Record<string, string>) || {}),
     };
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
       headers,
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        await this.clearTokens();
-        // Redirect to login or trigger re-auth
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        }
-      }
       const errData = await response.json().catch(() => null);
       throw new ApiError(response.status, errData);
     }
 
     return response.json();
-  }
+  },
 };
-

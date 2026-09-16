@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { Public } from '../../common/decorators/public.decorator';
@@ -19,8 +19,7 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
     const data = await this.authService.googleLogin(req);
-    // Ideally redirect to frontend with token, for now return json
-    return res.status(HttpStatus.OK).json(data);
+    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/login/success?token=${data.access_token}`);
   }
 }
-

@@ -17,7 +17,7 @@ export function LanguageSwitcher() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const onSelectChange = (nextLocale: string) => {
+  const onSelectChange = (nextLocale: string | null) => { if(!nextLocale) return;
     startTransition(() => {
       document.cookie = `NEXT_LOCALE=${nextLocale}; path=/; max-age=31536000; SameSite=Lax`;
       router.refresh();

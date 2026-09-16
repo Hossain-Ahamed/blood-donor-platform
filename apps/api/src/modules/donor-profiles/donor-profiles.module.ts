@@ -3,10 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DonorProfilesService } from './donor-profiles.service';
 import { DonorProfilesController } from './donor-profiles.controller';
 import { DonorProfile } from '../../entities/donor-profile.entity';
+import { User } from '../../entities/user.entity';
 import { DonorAvailabilityCron } from './donor-availability.cron';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DonorProfile])],
+  imports: [TypeOrmModule.forFeature([DonorProfile, User])],
   controllers: [DonorProfilesController],
   providers: [DonorProfilesService, DonorAvailabilityCron],
   exports: [DonorProfilesService],

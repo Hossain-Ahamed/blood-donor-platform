@@ -37,6 +37,18 @@ export class DonorProfile {
   @Column({ default: true })
   is_available: boolean;
 
+  @Column({ type: 'date', nullable: true })
+  date_of_birth: Date;
+
+  @Column({ type: 'smallint', nullable: true })
+  age: number;
+
+  @Column({ nullable: true })
+  religion: string;
+
+  @Column({ type: 'text', nullable: true })
+  health_notes: string;
+
   @Column({ type: 'text', nullable: true })
   bio: string;
 

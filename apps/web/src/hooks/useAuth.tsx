@@ -13,15 +13,15 @@ type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  login: (token: string, user: User) => void;
-  logout: () => void;
+  login: (user: User) => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: () => {},
-  logout: () => {},
+  logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -30,24 +30,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     apiClient
-      .request<{ success: boolean; data: User }>("/users/me")
+      .request<{ success: boolean; data: User } | User>("/users/me")
       .then((res) => {
-        // Mock response unpack since Nest returns raw user object
-        setUser(res as any);
+        const userData = "data" in res && res.data ? res.data : (res as User);
+        setUser(userData);
       })
       .catch(() => {
-        apiClient.clearTokens();
+        setUser(null);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const login = (token: string, user: User) => {
-    apiClient.setTokens(token);
+  const login = (user: User) => {
     setUser(user);
   };
 
-  const logout = () => {
-    apiClient.clearTokens();
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
     setUser(null);
     window.location.href = "/";
   };
