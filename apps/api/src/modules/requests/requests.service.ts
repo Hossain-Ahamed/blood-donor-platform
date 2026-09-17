@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Inject,
   Logger,
 } from "@nestjs/common";
@@ -34,6 +35,13 @@ export class RequestsService {
   ) {}
 
   async create(userId: string, dto: CreateRequestDto): Promise<BloodRequest> {
+    const userProfile = await this.donorProfilesService.findByUserId(userId);
+    if (!userProfile || !userProfile.blood_group) {
+      throw new BadRequestException(
+        "You must complete your profile with your blood group and location before creating a blood request",
+      );
+    }
+
     const location: Point = {
       type: "Point",
       coordinates: [dto.lng, dto.lat],

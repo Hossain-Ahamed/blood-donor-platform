@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { apiServer } from "@/lib/api/server";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -63,7 +64,9 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <ProfileForm initialData={profile} initialUser={user} />
+      <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading profile...</div>}>
+        <ProfileForm initialData={profile} initialUser={user} />
+      </Suspense>
     </div>
   );
 }

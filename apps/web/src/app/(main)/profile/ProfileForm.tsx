@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,7 @@ function calculateAge(dobString: string): number | null {
 
 export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     isSupported,
     isSubscribed,
@@ -167,7 +168,12 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       });
 
       toast.success("Profile updated successfully!");
-      router.refresh();
+      const redirectUrl = searchParams.get("redirect");
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       console.error("Save profile error:", err);
       if (err instanceof ApiError) {
