@@ -5,12 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
   Unique,
 } from "typeorm";
 import { ResponseStatus } from "@repo/shared";
 import { BloodRequest } from "./request.entity";
 import { User } from "./user.entity";
+import { Donation } from "./donation.entity";
 
 @Entity("responses")
 @Unique(["request_id", "donor_id"])
@@ -44,6 +46,9 @@ export class Response {
 
   @Column({ type: "text", nullable: true })
   rejection_reason: string;
+
+  @OneToOne(() => Donation, (donation) => donation.response, { nullable: true })
+  donation?: Donation;
 
   @CreateDateColumn({ type: "timestamptz" })
   created_at: Date;

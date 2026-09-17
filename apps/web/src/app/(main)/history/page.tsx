@@ -49,6 +49,12 @@ type AppliedResponse = {
   message?: string | null;
   rejection_reason?: string | null;
   created_at: string;
+  donation?: {
+    id: string;
+    donation_date: string;
+    confirmed_by_donor: boolean;
+    confirmed_by_requester?: boolean;
+  } | null;
   request?: {
     id: string;
     blood_group: string;
@@ -88,10 +94,18 @@ type Donation = {
 async function confirmDonationAction(formData: FormData) {
   "use server";
   const donationId = formData.get("donationId") as string;
-  if (!donationId) return;
+  const responseId = formData.get("responseId") as string;
+  if (!donationId && !responseId) return;
   try {
-    await apiServer.request(`/donations/${donationId}/confirm`, {
+    const url = responseId
+      ? `/donations/response/${responseId}/confirm`
+      : `/donations/${donationId}/confirm`;
+    await apiServer.request(url, {
       method: "PATCH",
+      body: JSON.stringify({ confirmed: true }),
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
     revalidatePath("/history");
   } catch (err) {
@@ -304,9 +318,19 @@ export default async function HistoryPage() {
                                     </Badge>
                                   )}
                                   {item.status === "ACCEPTED" && (
-                                    <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
+                                    <Badge
+                                      className={
+                                        item.donation?.confirmed_by_donor ||
+                                        item.donation?.confirmed_by_requester
+                                          ? "bg-emerald-600 hover:bg-emerald-600 text-white text-xs"
+                                          : "bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                                      }
+                                    >
                                       <CheckCircle2 className="w-3 h-3 mr-1" />
-                                      Accepted Offer
+                                      {item.donation?.confirmed_by_donor ||
+                                      item.donation?.confirmed_by_requester
+                                        ? "Donation Completed"
+                                        : "Accepted Offer"}
                                     </Badge>
                                   )}
                                   {item.status === "DECLINED" && (
@@ -436,6 +460,64 @@ export default async function HistoryPage() {
                                   </a>
                                 </div>
                               )}
+
+                            {item.status === "ACCEPTED" && (
+                              <div className="pt-2 border-t border-muted/60">
+                                {item.donation?.confirmed_by_donor ||
+                                item.donation?.confirmed_by_requester ? (
+                                  <div className="p-2.5 bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-md text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <div>
+                                      <span className="font-semibold">
+                                        Donation Confirmed & Completed!
+                                      </span>
+                                      <span className="ml-1 text-muted-foreground">
+                                        {item.donation?.confirmed_by_donor &&
+                                        item.donation?.confirmed_by_requester
+                                          ? "(Confirmed by both you and the requester)"
+                                          : item.donation?.confirmed_by_donor
+                                            ? "(Confirmed by you)"
+                                            : "(Confirmed by requester)"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-lg">
+                                    <div>
+                                      <p className="text-xs font-semibold text-emerald-950 dark:text-emerald-200 flex items-center gap-1.5">
+                                        <HeartHandshake className="w-4 h-4 text-emerald-600" />
+                                        Have you completed donating blood for this request?
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        Either you or the requester can confirm. Confirming logs your donation and begins your rest period.
+                                      </p>
+                                    </div>
+                                    <form action={confirmDonationAction}>
+                                      <input
+                                        type="hidden"
+                                        name="responseId"
+                                        value={item.id}
+                                      />
+                                      {item.donation?.id && (
+                                        <input
+                                          type="hidden"
+                                          name="donationId"
+                                          value={item.donation.id}
+                                        />
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        type="submit"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8 shadow-xs flex items-center gap-1.5 shrink-0"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        Confirm Donation Completed
+                                      </Button>
+                                    </form>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       );

@@ -123,7 +123,7 @@ export class ResponsesService {
 
     const responses = await this.responseRepository.find({
       where: { request_id: requestId },
-      relations: ["donor"],
+      relations: ["donor", "donation"],
       order: { created_at: "DESC" },
     });
 
@@ -151,6 +151,14 @@ export class ResponsesService {
         rejection_reason: hasFullAccess ? r.rejection_reason : undefined,
         created_at: r.created_at,
         updated_at: r.updated_at,
+        donation: r.donation
+          ? {
+              id: r.donation.id,
+              donation_date: r.donation.donation_date,
+              confirmed_by_donor: r.donation.confirmed_by_donor,
+              confirmed_by_requester: r.donation.confirmed_by_requester,
+            }
+          : null,
         donor: r.donor
           ? {
               id: r.donor.id,
@@ -183,13 +191,14 @@ export class ResponsesService {
   ): Promise<Response | null> {
     return this.responseRepository.findOne({
       where: { request_id: requestId, donor_id: donorId },
+      relations: ["donation"],
     });
   }
 
   async findMyAllResponses(donorId: string): Promise<Response[]> {
     return this.responseRepository.find({
       where: { donor_id: donorId },
-      relations: ["request"],
+      relations: ["request", "donation"],
       order: { created_at: "DESC" },
     });
   }

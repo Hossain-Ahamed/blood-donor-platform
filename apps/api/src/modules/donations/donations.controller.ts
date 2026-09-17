@@ -5,7 +5,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('donations')
 export class DonationsController {
-  constructor(private readonly donationsService: DonationsService) { }
+  constructor(private readonly donationsService: DonationsService) {}
 
   @Get('me')
   async getMyDonations(@CurrentUser() user: any) {
@@ -16,8 +16,21 @@ export class DonationsController {
   async confirm(
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Body() dto: ConfirmDonationDto,
+    @Body() dto?: ConfirmDonationDto,
   ) {
-    return this.donationsService.confirm(id, user.id, dto.confirmed);
+    return this.donationsService.confirm(id, user.id, dto?.confirmed ?? true);
+  }
+
+  @Patch('response/:responseId/confirm')
+  async confirmByResponse(
+    @Param('responseId') responseId: string,
+    @CurrentUser() user: any,
+    @Body() dto?: ConfirmDonationDto,
+  ) {
+    return this.donationsService.confirmByResponse(
+      responseId,
+      user.id,
+      dto?.confirmed ?? true,
+    );
   }
 }

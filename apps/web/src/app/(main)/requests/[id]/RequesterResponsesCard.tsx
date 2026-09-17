@@ -50,6 +50,12 @@ export interface RequesterDonorResponse {
   message?: string | null;
   rejection_reason?: string | null;
   created_at: string;
+  donation?: {
+    id: string;
+    donation_date: string;
+    confirmed_by_donor: boolean;
+    confirmed_by_requester: boolean;
+  } | null;
   donor: {
     id: string;
     name: string;
@@ -95,6 +101,46 @@ export function RequesterResponsesCard({
   const [declineReason, setDeclineReason] = useState("");
   const [isSubmittingDecline, setIsSubmittingDecline] = useState(false);
   const [isAcceptingId, setIsAcceptingId] = useState<string | null>(null);
+  const [isConfirmingId, setIsConfirmingId] = useState<string | null>(null);
+
+  const handleConfirmBloodReceived = async (
+    response: RequesterDonorResponse,
+  ) => {
+    setIsConfirmingId(response.id);
+    try {
+      await apiClient.request(`/donations/response/${response.id}/confirm`, {
+        method: "PATCH",
+        body: JSON.stringify({ confirmed: true }),
+      });
+
+      setResponses((prev) =>
+        prev.map((r) =>
+          r.id === response.id
+            ? {
+                ...r,
+                donation: {
+                  id: r.donation?.id || "",
+                  donation_date:
+                    r.donation?.donation_date || new Date().toISOString(),
+                  confirmed_by_donor: r.donation?.confirmed_by_donor || false,
+                  confirmed_by_requester: true,
+                },
+              }
+            : r,
+        ),
+      );
+
+      toast.success(
+        `Blood donation from ${response.donor?.name || "donor"} confirmed as received!`,
+      );
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to confirm blood donation:", err);
+      toast.error("Failed to confirm blood donation. Please try again.");
+    } finally {
+      setIsConfirmingId(null);
+    }
+  };
 
   const handleAccept = async (response: RequesterDonorResponse) => {
     setIsAcceptingId(response.id);
@@ -418,6 +464,32 @@ export function RequesterResponsesCard({
                             </Button>
                           </>
                         )}
+
+                        {item.status === "ACCEPTED" && (
+                          <>
+                            {item.donation?.confirmed_by_donor ||
+                            item.donation?.confirmed_by_requester ? (
+                              <Badge className="h-8 px-3 text-xs font-semibold bg-emerald-600 text-white flex items-center gap-1.5 shadow-xs">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Blood Received & Confirmed
+                              </Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center gap-1.5"
+                                onClick={() => handleConfirmBloodReceived(item)}
+                                disabled={isConfirmingId === item.id}
+                              >
+                                {isConfirmingId === item.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                )}
+                                Confirm Blood Received
+                              </Button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -658,13 +730,56 @@ export function RequesterResponsesCard({
               </>
             )}
 
+            {selectedDonorForProfile?.status === "ACCEPTED" && (
+              <>
+                {selectedDonorForProfile.donation?.confirmed_by_donor ||
+                selectedDonorForProfile.donation?.confirmed_by_requester ? (
+                  <Badge className="bg-emerald-600 text-white font-semibold py-1.5 px-3">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                    Blood Received & Confirmed
+                  </Badge>
+                ) : (
+                  <Button
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    onClick={() => {
+                      handleConfirmBloodReceived(selectedDonorForProfile);
+                      setSelectedDonorForProfile((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              donation: {
+                                id: prev.donation?.id || "",
+                                donation_date:
+                                  prev.donation?.donation_date ||
+                                  new Date().toISOString(),
+                                confirmed_by_donor:
+                                  prev.donation?.confirmed_by_donor || false,
+                                confirmed_by_requester: true,
+                              },
+                            }
+                          : null,
+                      );
+                    }}
+                    disabled={isConfirmingId === selectedDonorForProfile.id}
+                  >
+                    {isConfirmingId === selectedDonorForProfile.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Confirm Blood Received
+                  </Button>
+                )}
+              </>
+            )}
+
             {selectedDonorForProfile?.status === "ACCEPTED" &&
               selectedDonorForProfile.donor?.phone && (
                 <a
                   href={`tel:${selectedDonorForProfile.donor.phone}`}
                   className="w-full sm:w-auto"
                 >
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                     <Phone className="w-3.5 h-3.5 mr-1.5" />
                     Call Donor ({selectedDonorForProfile.donor.phone})
                   </Button>

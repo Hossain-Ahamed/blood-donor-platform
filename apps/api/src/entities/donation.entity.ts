@@ -9,7 +9,7 @@ export class Donation {
   @Column('uuid', { unique: true })
   response_id: string;
 
-  @OneToOne(() => Response)
+  @OneToOne(() => Response, (response) => response.donation)
   @JoinColumn({ name: 'response_id' })
   response: Response;
 
