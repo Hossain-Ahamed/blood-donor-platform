@@ -157,9 +157,30 @@ export default async function RequestDetailPage({
     <div className="container mx-auto p-4 md:p-8 max-w-5xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Need {getLabel(bloodGroupLabels, request.blood_group)}
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-3xl font-bold tracking-tight">
+              Need {getLabel(bloodGroupLabels, request.blood_group)}
+            </h1>
+            {request.urgency === "CRITICAL" ? (
+              <Badge
+                variant="destructive"
+                className="text-xs px-2.5 py-1 font-bold bg-red-600 animate-pulse shadow-xs"
+              >
+                Critical (Immediate)
+              </Badge>
+            ) : request.urgency === "URGENT" ? (
+              <Badge className="text-xs px-2.5 py-1 font-bold bg-amber-600 hover:bg-amber-600 text-white shadow-xs">
+                Urgent (Within 24h)
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="text-xs px-2.5 py-1 font-semibold border-blue-300 text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30"
+              >
+                Normal Urgency
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             Requested on{" "}
             {new Date(request.created_at).toLocaleDateString(undefined, {
@@ -185,12 +206,25 @@ export default async function RequestDetailPage({
             </Link>
           )}
 
-          <Badge
-            variant={request.urgency === "CRITICAL" ? "destructive" : "default"}
-            className="text-base md:text-lg px-4 py-1"
-          >
-            {getLabel(urgencyLabels, request.urgency)}
-          </Badge>
+          {request.urgency === "CRITICAL" ? (
+            <Badge
+              variant="destructive"
+              className="text-sm md:text-base px-3.5 py-1.5 font-bold bg-red-600 animate-pulse shadow-xs"
+            >
+              🚨 Critical Urgency
+            </Badge>
+          ) : request.urgency === "URGENT" ? (
+            <Badge className="text-sm md:text-base px-3.5 py-1.5 font-bold bg-amber-600 hover:bg-amber-600 text-white shadow-xs">
+              ⚡ Urgent (Within 24h)
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-sm md:text-base px-3.5 py-1.5 font-semibold border-blue-300 text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30"
+            >
+              Normal Urgency
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -375,6 +409,30 @@ export default async function RequestDetailPage({
                       ? `${request.hospital_name} (${request.area_name})`
                       : request.area_name}
                   </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Urgency Level</p>
+                  <div className="mt-1">
+                    {request.urgency === "CRITICAL" ? (
+                      <Badge
+                        variant="destructive"
+                        className="font-bold text-xs bg-red-600"
+                      >
+                        Critical (Immediate)
+                      </Badge>
+                    ) : request.urgency === "URGENT" ? (
+                      <Badge className="font-bold text-xs bg-amber-600 text-white">
+                        Urgent (Within 24h)
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="font-semibold text-xs border-blue-300 text-blue-700 dark:text-blue-400"
+                      >
+                        Normal
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
@@ -644,6 +702,7 @@ export default async function RequestDetailPage({
                     request.requester?.name || request.patient_name
                   }
                   donorPhone={userPhone}
+                  lastDonationDate={profile?.last_donation_date}
                 />
               )}
             </>

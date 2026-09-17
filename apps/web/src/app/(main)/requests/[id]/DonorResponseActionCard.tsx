@@ -42,6 +42,7 @@ interface DonorResponseActionCardProps {
   requesterContactPhone?: string | null;
   requesterName?: string | null;
   donorPhone?: string | null;
+  lastDonationDate?: string | Date | null;
 }
 
 export function DonorResponseActionCard({
@@ -51,6 +52,7 @@ export function DonorResponseActionCard({
   requesterContactPhone,
   requesterName,
   donorPhone,
+  lastDonationDate,
 }: DonorResponseActionCardProps) {
   const router = useRouter();
   const [response, setResponse] = useState<DonorResponse | null>(
@@ -60,11 +62,40 @@ export function DonorResponseActionCard({
   const [message, setMessage] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
 
+  // 90-day cooldown calculation
+  const cooldownDays = 90;
+  let inCooldown = false;
+  let daysRemaining = 0;
+  let eligibleDate: Date | null = null;
+  let formattedLastDonation = "";
+
+  if (lastDonationDate) {
+    const lastDate = new Date(lastDonationDate);
+    if (!isNaN(lastDate.getTime())) {
+      formattedLastDonation = lastDate.toLocaleDateString(undefined, {
+        dateStyle: "medium",
+      });
+      const eligible = new Date(lastDate);
+      eligible.setDate(eligible.getDate() + cooldownDays);
+      eligibleDate = eligible;
+      const diffTime = eligible.getTime() - Date.now();
+      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      inCooldown = daysRemaining > 0;
+    }
+  }
+
   const isRequestOpen =
     requestStatus === "OPEN" || requestStatus === "PARTIALLY_FULFILLED";
 
   const handleDonate = async () => {
     if (isSubmitting) return;
+
+    if (inCooldown) {
+      toast.error(
+        `You are in a medical rest cooldown period. You can donate again in ${daysRemaining} day(s).`,
+      );
+      return;
+    }
 
     if (!donorPhone?.trim()) {
       toast.error(
@@ -341,7 +372,30 @@ export function DonorResponseActionCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {showNoteInput && (
+        {inCooldown && (
+          <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg text-xs space-y-2">
+            <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200 font-bold">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Medical Rest Cooldown Active</span>
+            </div>
+            <p className="text-amber-900/80 dark:text-amber-300/80 leading-relaxed text-[11px]">
+              You last donated blood on <strong>{formattedLastDonation}</strong>. Medical guidelines require a 90-day recovery interval between donations.
+            </p>
+            <div className="flex items-center justify-between text-[11px] font-semibold text-amber-900 dark:text-amber-200 pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
+              <span>Rest remaining:</span>
+              <span className="bg-amber-200/70 dark:bg-amber-900 px-2 py-0.5 rounded text-amber-900 dark:text-amber-100 font-bold">
+                {daysRemaining} day{daysRemaining === 1 ? "" : "s"} left
+              </span>
+            </div>
+            {eligibleDate && (
+              <p className="text-[10px] text-muted-foreground text-right">
+                Eligible again on {eligibleDate.toLocaleDateString(undefined, { dateStyle: "medium" })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {showNoteInput && !inCooldown && (
           <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
             <label
               htmlFor="donor-note"
@@ -365,14 +419,23 @@ export function DonorResponseActionCard({
 
         <Button
           size="lg"
-          className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold shadow-sm transition-all"
+          className={
+            inCooldown
+              ? "w-full bg-amber-600/80 hover:bg-amber-600/80 text-white font-semibold shadow-sm cursor-not-allowed"
+              : "w-full bg-red-600 hover:bg-red-700 text-white font-semibold shadow-sm transition-all"
+          }
           onClick={handleDonate}
-          disabled={isSubmitting || !isRequestOpen}
+          disabled={inCooldown || isSubmitting || !isRequestOpen}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
               Submitting offer...
+            </>
+          ) : inCooldown ? (
+            <>
+              <Clock className="w-4 h-4 mr-2" />
+              In Cooldown ({daysRemaining} days left)
             </>
           ) : (
             <>

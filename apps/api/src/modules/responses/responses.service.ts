@@ -97,6 +97,23 @@ export class ResponsesService {
       );
     }
 
+    // Donor must have finished the 90-day cooldown period
+    if (donorProfile.last_donation_date) {
+      const lastDate = new Date(donorProfile.last_donation_date);
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      if (lastDate > ninetyDaysAgo) {
+        const eligibleDate = new Date(lastDate);
+        eligibleDate.setDate(eligibleDate.getDate() + 90);
+        const daysRemaining = Math.ceil(
+          (eligibleDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+        );
+        throw new BadRequestException(
+          `You are currently in a medical rest cooldown period. You last donated on ${lastDate.toLocaleDateString()}. You will be eligible to donate again in ${daysRemaining} day(s) (on ${eligibleDate.toLocaleDateString()}).`,
+        );
+      }
+    }
+
     const response = this.responseRepository.create({
       request_id: requestId,
       donor_id: donorId,
