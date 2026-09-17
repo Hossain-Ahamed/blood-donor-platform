@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -12,13 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { LocationPicker } from "@/components/LocationPicker";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { toast } from "sonner";
@@ -28,14 +21,12 @@ import {
   UrgencyLevel,
   RequestStatus,
 } from "@repo/shared";
-import {
-  bloodGroupLabels,
-  componentTypeLabels,
-  urgencyLabels,
-  requestStatusLabels,
-  getLabel,
-} from "@/lib/labels";
 import { Loader2, Save } from "lucide-react";
+import {
+  RequestEditStatusBloodFields,
+  type FormValues,
+} from "./request-edit/RequestEditStatusBloodFields";
+import { RequestEditPatientFields } from "./request-edit/RequestEditPatientFields";
 
 export interface RequestEditDialogProps {
   request: {
@@ -60,25 +51,6 @@ export interface RequestEditDialogProps {
   onClose: () => void;
   onSuccess: (updated: unknown) => void;
   isAdmin?: boolean;
-}
-
-interface FormValues {
-  blood_group: BloodGroup;
-  component_type: ComponentType;
-  units_needed: number;
-  units_fulfilled: number;
-  urgency: UrgencyLevel;
-  status: RequestStatus;
-  patient_name: string;
-  patient_age: string;
-  disease: string;
-  needed_time: string;
-  hospital_name: string;
-  area_name: string;
-  lat: number | null;
-  lng: number | null;
-  contact_phone: string;
-  patient_note: string;
 }
 
 function RequestEditForm({
@@ -151,27 +123,22 @@ function RequestEditForm({
       toast.error("Please select a blood group");
       return;
     }
-
     if (!data.contact_phone.trim()) {
       toast.error("Contact phone number is required");
       return;
     }
-
     if (!data.area_name.trim()) {
       toast.error("Area or locality name is required");
       return;
     }
-
     if (data.lat === null || data.lng === null) {
       toast.error("Please select the hospital / location pin on the map");
       return;
     }
-
     if (data.units_needed < 1) {
       toast.error("Units needed must be at least 1");
       return;
     }
-
     if (data.units_fulfilled < 0) {
       toast.error("Units fulfilled cannot be negative");
       return;
@@ -225,238 +192,8 @@ function RequestEditForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 py-2">
-      {/* Status & Urgency */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-muted/40 rounded-xl border">
-        <div>
-          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-            Status
-          </Label>
-          <Controller
-            name="status"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(val: string | null) =>
-                  val && field.onChange(val as RequestStatus)
-                }
-              >
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder="Select Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(RequestStatus).map((s) => (
-                    <SelectItem
-                      key={s}
-                      value={s}
-                      label={getLabel(requestStatusLabels, s)}
-                    >
-                      {getLabel(requestStatusLabels, s)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-            Blood Group *
-          </Label>
-          <Controller
-            name="blood_group"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(val: string | null) =>
-                  val && field.onChange(val as BloodGroup)
-                }
-              >
-                <SelectTrigger className="h-9 bg-background font-bold text-red-600 dark:text-red-400">
-                  <SelectValue placeholder="Select Blood Group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(BloodGroup).map((bg) => (
-                    <SelectItem
-                      key={bg}
-                      value={bg}
-                      label={getLabel(bloodGroupLabels, bg)}
-                    >
-                      {getLabel(bloodGroupLabels, bg)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-            Urgency Level
-          </Label>
-          <Controller
-            name="urgency"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(val: string | null) =>
-                  val && field.onChange(val as UrgencyLevel)
-                }
-              >
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder="Select Urgency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(UrgencyLevel).map((u) => (
-                    <SelectItem
-                      key={u}
-                      value={u}
-                      label={getLabel(urgencyLabels, u)}
-                    >
-                      {getLabel(urgencyLabels, u)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-      </div>
-
-      {/* Component & Units */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-            Component Type
-          </Label>
-          <Controller
-            name="component_type"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(val: string | null) =>
-                  val && field.onChange(val as ComponentType)
-                }
-              >
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder="Component Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(ComponentType).map((ct) => (
-                    <SelectItem
-                      key={ct}
-                      value={ct}
-                      label={getLabel(componentTypeLabels, ct)}
-                    >
-                      {getLabel(componentTypeLabels, ct)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-            Units Needed *
-          </Label>
-          <Input
-            type="number"
-            min="1"
-            {...register("units_needed", { valueAsNumber: true })}
-            className="h-9 bg-background"
-            required
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-            Units Fulfilled
-          </Label>
-          <Input
-            type="number"
-            min="0"
-            {...register("units_fulfilled", { valueAsNumber: true })}
-            className="h-9 bg-background"
-          />
-        </div>
-      </div>
-
-      {/* Patient Details */}
-      <div className="p-3 bg-muted/40 rounded-xl border space-y-3">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Patient & Medical Details
-        </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">
-              Patient Name
-            </Label>
-            <Input
-              {...register("patient_name")}
-              placeholder="e.g. Rahim Ali"
-              className="h-9 bg-background text-sm"
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">
-              Patient Age
-            </Label>
-            <Input
-              type="number"
-              min="0"
-              max="120"
-              {...register("patient_age")}
-              placeholder="e.g. 45"
-              className="h-9 bg-background text-sm"
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">
-              Disease / Reason
-            </Label>
-            <Input
-              {...register("disease")}
-              placeholder="e.g. Thalassemia, Surgery"
-              className="h-9 bg-background text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">
-              Needed Time / Deadline
-            </Label>
-            <Input
-              type="datetime-local"
-              {...register("needed_time")}
-              className="h-9 bg-background text-sm"
-            />
-          </div>
-
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">
-              Contact Phone *
-            </Label>
-            <Input
-              type="tel"
-              {...register("contact_phone")}
-              placeholder="e.g. +880 1712 345678"
-              className="h-9 bg-background text-sm"
-              required
-            />
-          </div>
-        </div>
-      </div>
+      <RequestEditStatusBloodFields control={control} register={register} />
+      <RequestEditPatientFields register={register} />
 
       {/* Hospital & Location */}
       <div className="p-3 bg-muted/40 rounded-xl border space-y-3">
@@ -507,18 +244,6 @@ function RequestEditForm({
             showAreaInput={false}
           />
         </div>
-      </div>
-
-      {/* Additional Notes */}
-      <div>
-        <Label className="text-xs font-semibold text-muted-foreground mb-1 block">
-          Patient Note / Additional Instructions
-        </Label>
-        <Input
-          {...register("patient_note")}
-          placeholder="Any specific notes or directions for potential donors..."
-          className="h-10 bg-background text-sm"
-        />
       </div>
 
       <DialogFooter className="pt-3 border-t flex flex-row justify-end gap-2">

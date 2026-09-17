@@ -1,19 +1,10 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -24,35 +15,19 @@ import {
 import { LocationPicker } from "@/components/LocationPicker";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { toast } from "sonner";
-import {
-  Loader2,
-  HeartHandshake,
-  User,
-  ShieldAlert,
-  Calendar,
-  Sparkles,
-  Phone,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { DonorProfile, User as UserType, BloodGroup } from "@repo/shared";
+import {
+  ProfilePersonalSection,
+  type ProfileFormValues,
+} from "./components/ProfilePersonalSection";
+import { ProfileMedicalSection } from "./components/ProfileMedicalSection";
+import { ProfileNotificationsSidebar } from "./components/ProfileNotificationsSidebar";
 
 type ProfileFormProps = {
   initialData?: (DonorProfile & { user?: UserType }) | null;
   initialUser?: UserType | null;
 };
-
-interface ProfileFormValues {
-  name: string;
-  phone: string;
-  blood_group: BloodGroup;
-  date_of_birth: string;
-  religion: string;
-  health_notes: string;
-  last_donation_date: string;
-  bio: string;
-  lat: number | null;
-  lng: number | null;
-  area_name: string;
-}
 
 function calculateAge(dobString: string): number | null {
   if (!dobString) return null;
@@ -77,13 +52,12 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
     subscribeToPush,
   } = usePushNotifications();
 
-  // Date of Birth initial value
   const rawDob = initialData?.date_of_birth;
   const initialDob = rawDob ? new Date(rawDob).toISOString().split("T")[0] : "";
 
-  // Location initial values
   const loc = initialData?.location as
-    { lat?: number; lng?: number; coordinates?: [number, number] } | undefined;
+    | { lat?: number; lng?: number; coordinates?: [number, number] }
+    | undefined;
   const initialLat =
     loc?.lat ??
     (Array.isArray(loc?.coordinates) && loc.coordinates.length === 2
@@ -134,22 +108,18 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       toast.error("Please enter your name");
       return;
     }
-
     if (!data.phone.trim()) {
       toast.error("Please enter your contact phone number");
       return;
     }
-
     if (data.lat === null || data.lng === null) {
       toast.error("Please select your location on the map or use GPS");
       return;
     }
-
     if (!data.area_name.trim()) {
       toast.error("Please enter your area or locality name");
       return;
     }
-
     if (computedAge !== null && computedAge < 16) {
       toast.error("Donors must be at least 16 years old to register");
       return;
@@ -206,217 +176,13 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="md:col-span-2 space-y-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Personal Information */}
-          <Card className="shadow-sm border-zinc-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5 text-red-600" />
-                Personal Information
-              </CardTitle>
-              <CardDescription>
-                Your personal and demographic details.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">
-                  Full Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  {...register("name")}
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
+          <ProfilePersonalSection
+            register={register}
+            control={control}
+            computedAge={computedAge}
+          />
 
-              <div className="grid gap-2">
-                <Label htmlFor="phone">
-                  Contact Phone Number <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    className="pl-9"
-                    {...register("phone")}
-                    placeholder="e.g. 01712345678 or +8801712345678"
-                    required
-                  />
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Required for emergency blood requests and donor coordination.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Date of Birth & Auto Age Calculation */}
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor="dateOfBirth"
-                      className="flex items-center gap-1"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      Date of Birth
-                    </Label>
-                    {computedAge !== null && (
-                      <Badge
-                        variant="secondary"
-                        className="text-xs font-semibold text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3 h-3 text-red-500" />
-                        Age: {computedAge} yrs
-                      </Badge>
-                    )}
-                  </div>
-                  <Input
-                    id="dateOfBirth"
-                    type="date"
-                    max={new Date().toISOString().split("T")[0]}
-                    {...register("date_of_birth")}
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Age is automatically calculated from your birth date.
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="religion">Religion</Label>
-                  <Controller
-                    name="religion"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={(val: string | null) =>
-                          field.onChange(val || "")
-                        }
-                      >
-                        <SelectTrigger id="religion">
-                          <SelectValue placeholder="Select Religion (Optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Islam" label="Islam">
-                            Islam
-                          </SelectItem>
-                          <SelectItem value="Hinduism" label="Hinduism">
-                            Hinduism
-                          </SelectItem>
-                          <SelectItem value="Christianity" label="Christianity">
-                            Christianity
-                          </SelectItem>
-                          <SelectItem value="Buddhism" label="Buddhism">
-                            Buddhism
-                          </SelectItem>
-                          <SelectItem value="Other" label="Other">
-                            Other
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Medical & Blood Details */}
-          <Card className="shadow-sm border-zinc-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HeartHandshake className="w-5 h-5 text-red-600" />
-                Medical & Donation Details
-              </CardTitle>
-              <CardDescription>
-                Update your blood group, cooldown date, and health history.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="bloodGroup">
-                    Blood Group <span className="text-red-500">*</span>
-                  </Label>
-                  <Controller
-                    name="blood_group"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={(val: string | null) =>
-                          val && field.onChange(val as BloodGroup)
-                        }
-                      >
-                        <SelectTrigger id="bloodGroup">
-                          <SelectValue placeholder="Select Blood Group" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="A_POS" label="A+">
-                            A+
-                          </SelectItem>
-                          <SelectItem value="A_NEG" label="A-">
-                            A-
-                          </SelectItem>
-                          <SelectItem value="B_POS" label="B+">
-                            B+
-                          </SelectItem>
-                          <SelectItem value="B_NEG" label="B-">
-                            B-
-                          </SelectItem>
-                          <SelectItem value="O_POS" label="O+">
-                            O+
-                          </SelectItem>
-                          <SelectItem value="O_NEG" label="O-">
-                            O-
-                          </SelectItem>
-                          <SelectItem value="AB_POS" label="AB+">
-                            AB+
-                          </SelectItem>
-                          <SelectItem value="AB_NEG" label="AB-">
-                            AB-
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="lastDonation">Last Donation Date</Label>
-                  <Input
-                    id="lastDonation"
-                    type="date"
-                    {...register("last_donation_date")}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Calculates your 90-day cooldown availability.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label
-                  htmlFor="healthNotes"
-                  className="flex items-center gap-1.5"
-                >
-                  <ShieldAlert className="w-4 h-4 text-amber-600" />
-                  Health Notes & Medical History
-                </Label>
-                <textarea
-                  id="healthNotes"
-                  rows={3}
-                  {...register("health_notes")}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="e.g. Any allergies, past medical conditions, weight, medications..."
-                />
-                <p className="text-xs text-muted-foreground">
-                  Relevant medical info to help ensure safe donation.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <ProfileMedicalSection register={register} control={control} />
 
           {/* Location & Bio */}
           <Card className="shadow-sm border-zinc-200">
@@ -450,7 +216,7 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                   id="bio"
                   rows={2}
                   {...register("bio")}
-                  className="flex min-h-[70px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-17.5 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="Additional notes about your availability or preferred times..."
                 />
               </div>
@@ -477,58 +243,12 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
 
       {/* Notifications Sidebar */}
       <div className="space-y-6">
-        <Card className="shadow-sm border-zinc-200">
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              Get alerted immediately when someone needs your blood group
-              nearby.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!isSupported ? (
-              <p className="text-sm text-muted-foreground">
-                Push notifications not supported in this browser.
-              </p>
-            ) : pushLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Checking push status...
-              </div>
-            ) : isSubscribed ? (
-              <div className="flex items-center gap-2 text-green-600 font-medium text-sm">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Notifications Active
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Enable push notifications to receive urgent blood donation
-                  requests.
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900"
-                  onClick={subscribeToPush}
-                >
-                  Enable Notifications
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ProfileNotificationsSidebar
+          isSupported={isSupported}
+          pushLoading={pushLoading}
+          isSubscribed={isSubscribed}
+          onSubscribe={subscribeToPush}
+        />
       </div>
     </div>
   );

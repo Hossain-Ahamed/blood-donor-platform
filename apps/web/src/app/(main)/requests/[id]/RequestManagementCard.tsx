@@ -11,14 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { RequestEditDialog } from "@/components/RequestEditDialog";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { toast } from "sonner";
@@ -32,11 +24,11 @@ import {
   Loader2,
   ShieldCheck,
   UserCheck,
-  AlertTriangle,
   ExternalLink,
 } from "lucide-react";
 import { RequestStatus } from "@repo/shared";
 import { requestStatusLabels, getLabel } from "@/lib/labels";
+import { RequestDeleteModal } from "./RequestDeleteModal";
 
 interface RequestManagementCardProps {
   request: {
@@ -81,9 +73,7 @@ export function RequestManagementCard({
         : `/requests/${request.id}`;
 
       const res = await apiClient.request<
-        | {
-            data?: Partial<typeof request>;
-          }
+        | { data?: Partial<typeof request> }
         | Partial<typeof request>
       >(endpoint, {
         method: "PATCH",
@@ -143,20 +133,16 @@ export function RequestManagementCard({
     }
   };
 
-  const isFulfilled = request.status === "FULFILLED";
-  const isCancelled = request.status === "CANCELLED";
-  const isOpen = request.status === "OPEN";
-
   return (
     <>
       <Card className="border-red-200 dark:border-red-950/60 shadow-sm bg-card">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               {isAdmin && !isOwnRequest ? (
                 <>
                   <ShieldCheck className="w-5 h-5 text-red-600" />
-                  Admin Request Controls
+                  Admin Controls
                 </>
               ) : (
                 <>
@@ -167,245 +153,131 @@ export function RequestManagementCard({
             </CardTitle>
             <Badge
               variant={
-                isOpen
+                request.status === "OPEN"
                   ? "default"
-                  : isFulfilled
+                  : request.status === "FULFILLED"
                     ? "secondary"
-                    : isCancelled
+                    : request.status === "CANCELLED"
                       ? "destructive"
                       : "outline"
               }
-              className="text-xs font-semibold uppercase"
+              className="text-xs"
             >
               {getLabel(requestStatusLabels, request.status)}
             </Badge>
           </div>
           <CardDescription className="text-xs">
-            {isOwnRequest
-              ? "You created this request. You can update details, change status, or delete it."
-              : "Administrator privileges enabled for this blood request."}
+            Update status, edit patient information, or manage visibility.
           </CardDescription>
         </CardHeader>
+        <CardContent className="space-y-3">
+          <Button
+            variant="outline"
+            className="w-full flex items-center justify-center gap-2 font-semibold text-xs h-9 border-zinc-300 dark:border-zinc-700"
+            onClick={() => setIsEditDialogOpen(true)}
+          >
+            <Edit3 className="w-4 h-4 text-blue-600" />
+            Edit Request Details
+          </Button>
 
-        <CardContent className="space-y-4 text-xs">
-          {/* Status guidance message */}
-          {isOpen && (
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-              <div>
-                <p className="font-semibold">Request is currently Open</p>
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                  Donors nearby can view this request. Once blood has been
-                  collected or donors found, mark it completed. If donors are no
-                  longer needed, mark it as cancelled.
-                </p>
-              </div>
-            </div>
-          )}
+          <div className="pt-1 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Quick Status Actions:
+            </p>
 
-          {isFulfilled && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-800 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
-              <div>
-                <p className="font-semibold">Marked as Completed / Fulfilled</p>
-                <p className="text-[11px] text-blue-700 dark:text-blue-400 mt-0.5">
-                  This request was completed. If you still need more blood bags,
-                  you can reopen this request or edit the units needed.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {isCancelled && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-800 flex items-start gap-2">
-              <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-              <div>
-                <p className="font-semibold">Marked as No Longer Needed</p>
-                <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
-                  This request was cancelled. You can reopen it at any time if
-                  blood is needed again.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Quick Status Action Buttons */}
-          <div className="space-y-2 pt-2 border-t">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Status Actions
-            </span>
-            <div className="flex flex-col gap-2">
-              {isOpen ? (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleUpdateStatus(RequestStatus.FULFILLED)}
-                    disabled={isStatusUpdating}
-                    className="w-full justify-center text-xs h-9 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/50 font-semibold shadow-sm"
-                  >
-                    {isStatusUpdating ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                    ) : (
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-emerald-600 shrink-0" />
-                    )}
-                    <span>Mark Completed</span>
-                  </Button>
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleUpdateStatus(RequestStatus.CANCELLED)}
-                    disabled={isStatusUpdating}
-                    className="w-full justify-center text-xs h-9 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/50 font-semibold shadow-sm"
-                  >
-                    {isStatusUpdating ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                    ) : (
-                      <XCircle className="w-3.5 h-3.5 mr-1.5 text-amber-600 shrink-0" />
-                    )}
-                    <span>No Longer Needed</span>
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleUpdateStatus(RequestStatus.OPEN)}
-                  disabled={isStatusUpdating}
-                  className="w-full justify-center text-xs h-9 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/50 font-semibold shadow-sm"
-                >
-                  {isStatusUpdating ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                  ) : (
-                    <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-emerald-600 shrink-0" />
-                  )}
-                  <span>Re-open Blood Request</span>
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Edit & Delete Action Buttons */}
-          <div className="space-y-2 pt-2 border-t">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Manage Details
-            </span>
-            <div className="grid grid-cols-2 gap-2">
+            {request.status !== "FULFILLED" && (
               <Button
-                type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setIsEditDialogOpen(true)}
-                className="w-full justify-center text-xs font-semibold h-9 border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 shadow-sm"
+                className="w-full border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center justify-center gap-1.5 text-xs h-8"
+                onClick={() => handleUpdateStatus(RequestStatus.FULFILLED)}
+                disabled={isStatusUpdating}
               >
-                <Edit3 className="w-3.5 h-3.5 mr-1.5 text-blue-600 shrink-0" />
-                <span>Modify Details</span>
+                {isStatusUpdating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                )}
+                Mark as Fulfilled (Received)
               </Button>
+            )}
 
+            {request.status !== "OPEN" && (
               <Button
-                type="button"
-                variant="destructive"
+                variant="outline"
                 size="sm"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="w-full justify-center text-xs font-semibold h-9 shadow-sm"
+                className="w-full border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center justify-center gap-1.5 text-xs h-8"
+                onClick={() => handleUpdateStatus(RequestStatus.OPEN)}
+                disabled={isStatusUpdating}
               >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5 shrink-0" />
-                <span>Delete</span>
+                {isStatusUpdating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
+                Reopen Request
               </Button>
-            </div>
+            )}
+
+            {request.status !== "CANCELLED" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/5 flex items-center justify-center gap-1.5 text-xs h-8"
+                onClick={() => handleUpdateStatus(RequestStatus.CANCELLED)}
+                disabled={isStatusUpdating}
+              >
+                {isStatusUpdating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5" />
+                )}
+                Cancel Request
+              </Button>
+            )}
           </div>
 
-          {isAdmin && (
-            <div className="space-y-2 pt-2 border-t">
-              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-                Admin Control
-              </span>
-              <Link
-                href={`/admin/requests?requestId=${request.id}`}
-                className="block w-full"
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-center text-xs font-semibold h-9 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50 shadow-sm"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-red-600 shrink-0" />
-                  <span>Show full detail</span>
-                  <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-70" />
-                </Button>
+          <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
+            {isAdmin && (
+              <Link href="/admin/requests" className="text-xs text-muted-foreground hover:underline flex items-center gap-1">
+                <ExternalLink className="w-3 h-3" />
+                Admin Dashboard
               </Link>
-            </div>
-          )}
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto h-8 px-2.5 flex items-center gap-1"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Request
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Edit Request Dialog */}
       <RequestEditDialog
         request={request}
         isOpen={isEditDialogOpen}
-        onClose={() => setIsEditDialogOpen(false)}
         isAdmin={isAdmin}
+        onClose={() => setIsEditDialogOpen(false)}
         onSuccess={(updated) => {
           setRequest((prev) => ({
             ...prev,
-            ...(updated || {}),
+            ...((updated as Partial<typeof request>) || {}),
           }));
           router.refresh();
         }}
       />
 
-      {/* Confirm Delete Dialog */}
-      <Dialog
-        open={isDeleteDialogOpen}
-        onOpenChange={(open) => !open && setIsDeleteDialogOpen(false)}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-600 mb-2">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <DialogTitle className="text-lg font-bold">
-              Delete Blood Request?
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Are you sure you want to delete this blood request? It will be
-              removed from donor searches and public listings.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="pt-2 flex flex-row justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDeleteDialogOpen(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteRequest}
-              disabled={isDeleting}
-              className="font-semibold"
-            >
-              {isDeleting ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-1.5" />
-              )}
-              Yes, Delete Request
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RequestDeleteModal
+        isOpen={isDeleteDialogOpen}
+        isDeleting={isDeleting}
+        isAdmin={isAdmin}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteRequest}
+      />
     </>
   );
 }

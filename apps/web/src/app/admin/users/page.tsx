@@ -1,49 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { apiClient } from "@/lib/api/client";
 import { User, UserRole } from "@repo/shared";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Search,
-  MoreHorizontal,
-  Shield,
-  UserX,
-  UserCheck,
-  ShieldAlert,
-} from "lucide-react";
 import { toast } from "sonner";
+import { AdminUsersFilters } from "./components/AdminUsersFilters";
+import { AdminUsersTable } from "./components/AdminUsersTable";
+import { AdminUserActionDialog } from "./components/AdminUserActionDialog";
 
 interface PaginatedResponse<T> {
   data: T[];
@@ -107,17 +70,16 @@ export default function AdminUsersPage() {
       setUsers(data.data as User[]);
       setTotalPages(data.meta.totalPages as number);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to fetch users");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to fetch users",
+      );
     } finally {
       setLoading(false);
     }
   }, [debouncedSearch, isActive, role, page]);
 
   useEffect(() => {
-    const loadData = async () => {
-      await fetchUsers();
-    };
-    loadData();
+    fetchUsers();
   }, [fetchUsers]);
 
   const handleAction = async () => {
@@ -139,7 +101,9 @@ export default function AdminUsersPage() {
       fetchUsers();
       closeDialog();
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to update user");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update user",
+      );
     } finally {
       setActionLoading(false);
     }
@@ -151,222 +115,55 @@ export default function AdminUsersPage() {
     setNewRole(null);
   };
 
+  const handleOpenDialog = (
+    user: User,
+    action: "block" | "unblock" | "role",
+  ) => {
+    setSelectedUser(user);
+    setDialogAction(action);
+    if (action === "role") {
+      setNewRole(user.role === "ADMIN" ? UserRole.USER : UserRole.ADMIN);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Users</h1>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, or phone..."
-            className="pl-8"
-            value={search}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-4">
-          <Select
-            value={isActive}
-            onValueChange={(val: string | null) => {
-              setIsActive(val || "all");
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-45">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="true">Active</SelectItem>
-              <SelectItem value="false">Blocked</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={role}
-            onValueChange={(val: string | null) => {
-              setRole(val || "all");
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-45">
-              <SelectValue placeholder="Role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="USER">User</SelectItem>
-              <SelectItem value="ADMIN">Admin</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <AdminUsersFilters
+        search={search}
+        isActive={isActive}
+        role={role}
+        onSearchChange={setSearch}
+        onStatusChange={(val) => {
+          setIsActive(val);
+          setPage(1);
+        }}
+        onRoleChange={(val) => {
+          setRole(val);
+          setPage(1);
+        }}
+      />
 
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-25">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">
-                  No users found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map((user: User) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.phone || "-"}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={user.role === "ADMIN" ? "default" : "secondary"}
-                    >
-                      {user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.is_active ? "outline" : "destructive"}>
-                      {user.is_active ? "Active" : "Blocked"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {user.is_active ? (
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setDialogAction("block");
-                            }}
-                          >
-                            <UserX className="mr-2 h-4 w-4 text-destructive" />
-                            <span className="text-destructive">Block User</span>
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setDialogAction("unblock");
-                            }}
-                          >
-                            <UserCheck className="mr-2 h-4 w-4 text-green-600" />
-                            <span className="text-green-600">Unblock User</span>
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setDialogAction("role");
-                            setNewRole(
-                              user.role === "ADMIN"
-                                ? UserRole.USER
-                                : UserRole.ADMIN,
-                            );
-                          }}
-                        >
-                          {user.role === "ADMIN" ? (
-                            <ShieldAlert className="mr-2 h-4 w-4" />
-                          ) : (
-                            <Shield className="mr-2 h-4 w-4" />
-                          )}
-                          <span>
-                            Make {user.role === "ADMIN" ? "User" : "Admin"}
-                          </span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <AdminUsersTable
+        users={users}
+        loading={loading}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        onOpenDialog={handleOpenDialog}
+      />
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p: number) => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-          >
-            Previous
-          </Button>
-          <div className="text-sm font-medium">
-            Page {page} of {totalPages}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-          >
-            Next
-          </Button>
-        </div>
-      )}
-
-      <Dialog
-        open={!!dialogAction}
-        onOpenChange={(open: boolean) => !open && closeDialog()}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {dialogAction === "block" && "Block User"}
-              {dialogAction === "unblock" && "Unblock User"}
-              {dialogAction === "role" && "Change User Role"}
-            </DialogTitle>
-            <DialogDescription>
-              {dialogAction === "block" &&
-                `Are you sure you want to block ${selectedUser?.name}? They will not be able to log in.`}
-              {dialogAction === "unblock" &&
-                `Are you sure you want to unblock ${selectedUser?.name}? They will regain access to the platform.`}
-              {dialogAction === "role" &&
-                `Are you sure you want to change ${selectedUser?.name}'s role to ${newRole}?`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={closeDialog}
-              disabled={actionLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant={dialogAction === "block" ? "destructive" : "default"}
-              onClick={handleAction}
-              disabled={actionLoading}
-            >
-              {actionLoading ? "Updating..." : "Confirm"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AdminUserActionDialog
+        dialogAction={dialogAction}
+        selectedUser={selectedUser}
+        newRole={newRole}
+        actionLoading={actionLoading}
+        onClose={closeDialog}
+        onConfirm={handleAction}
+      />
     </div>
   );
 }

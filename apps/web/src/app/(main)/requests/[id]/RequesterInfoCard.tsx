@@ -13,9 +13,10 @@ interface RequesterInfoCardProps {
   requester?: Partial<User> | null;
   contactPhone: string;
   requesterProfile?: {
-    area_name?: string;
-    blood_group?: string;
-    is_available?: boolean;
+    area_name?: string | null;
+    blood_group?: string | null;
+    is_available?: boolean | null;
+    last_donation_date?: string | Date | null;
   } | null;
 }
 
