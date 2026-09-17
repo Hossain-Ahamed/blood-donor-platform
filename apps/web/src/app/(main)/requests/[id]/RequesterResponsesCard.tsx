@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   XCircle,
   Phone,
+  Mail,
   MessageSquare,
   Clock,
   Loader2,
@@ -70,7 +71,6 @@ export interface RequesterDonorResponse {
 interface RequesterResponsesCardProps {
   requestId: string;
   initialResponses: RequesterDonorResponse[];
-  isRequesterOrAdmin?: boolean;
 }
 
 const DECLINE_REASON_PRESETS = [
@@ -84,7 +84,6 @@ const DECLINE_REASON_PRESETS = [
 export function RequesterResponsesCard({
   requestId,
   initialResponses,
-  isRequesterOrAdmin = false,
 }: RequesterResponsesCardProps) {
   const router = useRouter();
   const [responses, setResponses] =
@@ -208,9 +207,8 @@ export function RequesterResponsesCard({
             </div>
           </div>
           <CardDescription className="text-xs">
-            {isRequesterOrAdmin
-              ? "Review volunteer donors, inspect full profile, and manage offers."
-              : "People who have volunteered to donate blood for this patient."}
+            Review volunteer donors, inspect their donor profile, contact them,
+            and accept or decline offers.
           </CardDescription>
         </CardHeader>
 
@@ -331,61 +329,59 @@ export function RequesterResponsesCard({
                         </div>
                       </div>
 
-                      {/* Contact & Actions (Admin & Requester) */}
-                      {isRequesterOrAdmin && (
-                        <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
-                          {/* View Full Profile Button */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs font-medium flex items-center gap-1.5"
-                            onClick={() => setSelectedDonorForProfile(item)}
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            View Profile
-                          </Button>
+                      {/* Contact & Actions */}
+                      <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                        {/* View Full Profile Button */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs font-medium flex items-center gap-1.5"
+                          onClick={() => setSelectedDonorForProfile(item)}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          View Profile
+                        </Button>
 
-                          {donor?.phone && (
-                            <a href={`tel:${donor.phone}`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs font-medium flex items-center gap-1 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-                              >
-                                <Phone className="w-3.5 h-3.5" />
-                                {donor.phone}
-                              </Button>
-                            </a>
-                          )}
+                        {donor?.phone && (
+                          <a href={`tel:${donor.phone}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs font-medium flex items-center gap-1 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                              {donor.phone}
+                            </Button>
+                          </a>
+                        )}
 
-                          {item.status === "OFFERED" && (
-                            <>
-                              <Button
-                                size="sm"
-                                className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                                onClick={() => handleAccept(item)}
-                                disabled={isAccepting}
-                              >
-                                {isAccepting ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                                ) : (
-                                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                                )}
-                                Accept Offer
-                              </Button>
+                        {item.status === "OFFERED" && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                              onClick={() => handleAccept(item)}
+                              disabled={isAccepting}
+                            >
+                              {isAccepting ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                              )}
+                              Accept Offer
+                            </Button>
 
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                                onClick={() => handleOpenDeclineModal(item)}
-                              >
-                                Decline
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => handleOpenDeclineModal(item)}
+                            >
+                              Decline
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* Donor Note for Request */}
@@ -446,9 +442,7 @@ export function RequesterResponsesCard({
               <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl border">
                 <Avatar className="h-14 w-14 border shrink-0">
                   <AvatarImage
-                    src={
-                      selectedDonorForProfile.donor?.avatar_url || undefined
-                    }
+                    src={selectedDonorForProfile.donor?.avatar_url || undefined}
                   />
                   <AvatarFallback className="font-bold text-lg bg-red-100 dark:bg-red-950 text-red-600">
                     {selectedDonorForProfile.donor?.name?.[0]?.toUpperCase() ||

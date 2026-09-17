@@ -17,14 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  MapPin,
-  Navigation,
-  ExternalLink,
-  Phone,
-  User as UserIcon,
-} from "lucide-react";
+import { MapPin, Navigation, ExternalLink } from "lucide-react";
 import { RequestManagementCard } from "./RequestManagementCard";
 import {
   DonorResponseActionCard,
@@ -41,19 +34,6 @@ type BloodRequestDetail = BloodRequest & {
     type: string;
     coordinates: [number, number];
   };
-  requester?: {
-    id: string;
-    name: string;
-    email?: string;
-    avatar_url?: string | null;
-    phone?: string | null;
-  } | null;
-  requester_profile?: {
-    area_name?: string | null;
-    blood_group?: string | null;
-    is_available?: boolean;
-    last_donation_date?: string | null;
-  } | null;
 };
 
 type ProfileWithUser = DonorProfile & { user?: User };
@@ -68,25 +48,20 @@ export default async function RequestDetailPage({
   let user: User | null = null;
   let profile: ProfileWithUser | null = null;
   let myResponse: DonorResponse | null = null;
-  let responses: RequesterDonorResponse[] = [];
 
   try {
-    const [reqRes, userRes, profileRes, myRespRes, responsesRes] =
-      await Promise.allSettled([
-        apiServer.request<{ data: BloodRequestDetail } | BloodRequestDetail>(
-          `/requests/${id}`,
-        ),
-        apiServer.request<{ data: User } | User>("/users/me"),
-        apiServer.request<{ data: ProfileWithUser } | ProfileWithUser>(
-          "/donor-profiles/me",
-        ),
-        apiServer.request<{ data: DonorResponse } | DonorResponse>(
-          `/requests/${id}/my-response`,
-        ),
-        apiServer.request<
-          { data: RequesterDonorResponse[] } | RequesterDonorResponse[]
-        >(`/requests/${id}/responses`),
-      ]);
+    const [reqRes, userRes, profileRes, myRespRes] = await Promise.allSettled([
+      apiServer.request<{ data: BloodRequestDetail } | BloodRequestDetail>(
+        `/requests/${id}`,
+      ),
+      apiServer.request<{ data: User } | User>("/users/me"),
+      apiServer.request<{ data: ProfileWithUser } | ProfileWithUser>(
+        "/donor-profiles/me",
+      ),
+      apiServer.request<{ data: DonorResponse } | DonorResponse>(
+        `/requests/${id}/my-response`,
+      ),
+    ]);
 
     if (reqRes.status === "fulfilled") {
       const val = reqRes.value;
@@ -106,14 +81,6 @@ export default async function RequestDetailPage({
       myResponse =
         "data" in val && val.data ? val.data : (val as DonorResponse);
     }
-    if (responsesRes.status === "fulfilled" && responsesRes.value) {
-      const val = responsesRes.value;
-      responses = Array.isArray(val)
-        ? val
-        : "data" in val && Array.isArray(val.data)
-          ? val.data
-          : [];
-    }
   } catch (error) {
     console.error(error);
   }
@@ -124,6 +91,22 @@ export default async function RequestDetailPage({
 
   const isOwnRequest = user?.id === request.requester_id;
   const isProfileComplete = Boolean(profile && profile.blood_group);
+
+  let responses: RequesterDonorResponse[] = [];
+  if (isOwnRequest || user?.role === "ADMIN") {
+    try {
+      const respRes = await apiServer.request<
+        { data: RequesterDonorResponse[] } | RequesterDonorResponse[]
+      >(`/requests/${id}/responses`);
+      responses = Array.isArray(respRes)
+        ? respRes
+        : "data" in respRes && Array.isArray(respRes.data)
+          ? respRes.data
+          : [];
+    } catch (e) {
+      console.error("Failed to fetch responses for request:", e);
+    }
+  }
 
   const coordinates = request.location?.coordinates;
   const hasCoords = Boolean(
@@ -139,18 +122,6 @@ export default async function RequestDetailPage({
   const googleSearchUrl = hasCoords
     ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
     : "#";
-
-  const requester = request.requester;
-  const requesterArea =
-    request.requester_profile?.area_name || request.area_name;
-  const requesterInitials = requester?.name
-    ? requester.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .substring(0, 2)
-        .toUpperCase()
-    : "R";
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-5xl">
@@ -173,100 +144,11 @@ export default async function RequestDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Requester Profile Card */}
-          <Card className="border-red-100 dark:border-red-950/60 shadow-xs bg-card">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <UserIcon className="w-4 h-4 text-red-600" />
-                  Request Posted By
-                </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="text-xs font-medium border-red-200 text-red-700 dark:text-red-400"
-                >
-                  Requester Profile
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                  <Avatar className="h-12 w-12 border border-muted-foreground/20 shrink-0 shadow-xs">
-                    <AvatarImage
-                      src={requester?.avatar_url || undefined}
-                      alt={requester?.name || "Requester"}
-                    />
-                    <AvatarFallback className="font-bold bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 text-sm">
-                      {requesterInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-base text-foreground">
-                        {requester?.name || "Verified Community Member"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                      <span className="flex items-center gap-1 font-medium text-foreground/80">
-                        <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                        <span>{requesterArea}</span>
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Posted on{" "}
-                        {new Date(request.created_at).toLocaleDateString(
-                          undefined,
-                          { dateStyle: "medium" },
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {request.contact_phone && (
-                  <a href={`tel:${request.contact_phone}`} className="shrink-0">
-                    <Button
-                      size="sm"
-                      className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center gap-1.5 shadow-xs h-9 px-3.5"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      Call {requester?.name?.split(" ")[0] || "Requester"}
-                    </Button>
-                  </a>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Patient & Medical Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {request.contact_phone && (
-                <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/80 rounded-xl flex items-center justify-between gap-3 shadow-xs">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5" />
-                      Requester / Emergency Contact
-                    </p>
-                    <p className="text-base sm:text-lg font-black text-foreground tracking-tight">
-                      {request.contact_phone}
-                    </p>
-                  </div>
-                  <a href={`tel:${request.contact_phone}`}>
-                    <Button
-                      size="sm"
-                      className="bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center gap-1.5 shadow-sm h-9 px-3.5"
-                    >
-                      <Phone className="w-4 h-4" />
-                      Call Requester
-                    </Button>
-                  </a>
-                </div>
-              )}
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {request.patient_name && (
                   <div>
@@ -433,11 +315,12 @@ export default async function RequestDetailPage({
             </CardContent>
           </Card>
 
-          <RequesterResponsesCard
-            requestId={id}
-            initialResponses={responses}
-            isRequesterOrAdmin={Boolean(isOwnRequest || user?.role === "ADMIN")}
-          />
+          {(isOwnRequest || user?.role === "ADMIN") && (
+            <RequesterResponsesCard
+              requestId={id}
+              initialResponses={responses}
+            />
+          )}
         </div>
 
         <div className="space-y-6">
