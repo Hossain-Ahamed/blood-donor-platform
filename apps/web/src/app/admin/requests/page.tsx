@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import { useState, useMemo, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -193,6 +194,7 @@ function AdminRequestsContent() {
   const [selectedRequest, setSelectedRequest] =
     useState<RequestWithRequester | null>(null);
   const [searchIdInput, setSearchIdInput] = useState(requestIdParam);
+  const [handledRequestId, setHandledRequestId] = useState<string | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -326,8 +328,58 @@ function AdminRequestsContent() {
   });
 
   const requests = requestsData?.requests ?? [];
+  const requests = useMemo(
+    () => requestsData?.requests ?? [],
+    [requestsData?.requests],
+  );
   const totalCount = requestsData?.totalCount ?? 0;
   const totalPages = requestsData?.totalPages ?? 1;
+
+  // Auto-select and open detail dialog if navigated directly with ?requestId=
+  useEffect(() => {
+    if (requestIdParam && requests.length > 0) {
+    if (!requestIdParam && handledRequestId !== null) {
+      setHandledRequestId(null);
+    } else if (
+      requestIdParam &&
+      handledRequestId !== requestIdParam &&
+      requests.length > 0
+    ) {
+      const match = requests.find(
+        (r) =>
+          r.id.toLowerCase() === requestIdParam.toLowerCase() ||
+          r.id.toLowerCase().startsWith(requestIdParam.toLowerCase()),
+      );
+      if (match && selectedRequest?.id !== match.id) {
+      if (match) {
+        setHandledRequestId(requestIdParam);
+        setSelectedRequest(match);
+        setIsDetailDialogOpen(true);
+      } else if (!loading) {
+        setHandledRequestId(requestIdParam);
+      }
+  if (!requestIdParam && handledRequestId !== null) {
+    setHandledRequestId(null);
+  } else if (
+    requestIdParam &&
+    handledRequestId !== requestIdParam &&
+    requests.length > 0
+  ) {
+    const match = requests.find(
+      (r) =>
+        r.id.toLowerCase() === requestIdParam.toLowerCase() ||
+        r.id.toLowerCase().startsWith(requestIdParam.toLowerCase()),
+    );
+    if (match) {
+      setHandledRequestId(requestIdParam);
+      setSelectedRequest(match);
+      setIsDetailDialogOpen(true);
+    } else if (!loading) {
+      setHandledRequestId(requestIdParam);
+    }
+  }, [requestIdParam, requests, selectedRequest?.id]);
+  }
+  }, [requestIdParam, handledRequestId, requests, loading]);
 
   // 3. Status update mutation
   const updateStatusMutation = useMutation({
@@ -1044,7 +1096,7 @@ function AdminRequestsContent() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl md:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           {selectedRequest && (
             <>
               <DialogHeader>
@@ -1340,7 +1392,7 @@ function AdminRequestsContent() {
         open={isDeleteDialogOpen}
         onOpenChange={(open) => !open && setIsDeleteDialogOpen(false)}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-full max-w-md sm:max-w-md">
           <DialogHeader>
             <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-600 mb-2">
               <AlertTriangle className="w-5 h-5" />

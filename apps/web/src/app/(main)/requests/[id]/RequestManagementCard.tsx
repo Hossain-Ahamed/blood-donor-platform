@@ -22,6 +22,7 @@ import {
 import { RequestEditDialog } from "@/components/RequestEditDialog";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { toast } from "sonner";
+import Link from "next/link";
 import {
   CheckCircle2,
   XCircle,
@@ -32,6 +33,7 @@ import {
   ShieldCheck,
   UserCheck,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { RequestStatus } from "@repo/shared";
 import { requestStatusLabels, getLabel } from "@/lib/labels";
@@ -316,6 +318,29 @@ export function RequestManagementCard({
               </Button>
             </div>
           </div>
+
+          {isAdmin && (
+            <div className="space-y-2 pt-2 border-t">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Admin Control
+              </span>
+              <Link
+                href={`/admin/requests?requestId=${request.id}`}
+                className="block w-full"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center text-xs font-semibold h-9 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50 shadow-sm"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-red-600 shrink-0" />
+                  <span>Show full detail</span>
+                  <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-70" />
+                </Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 

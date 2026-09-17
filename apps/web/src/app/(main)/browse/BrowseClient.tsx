@@ -240,6 +240,11 @@ export function BrowseClient({
 
   // Switch to Live GPS Location
   const switchToGpsLocation = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+    setIsLocating(true);
     detectGpsLocation(true);
   };
 

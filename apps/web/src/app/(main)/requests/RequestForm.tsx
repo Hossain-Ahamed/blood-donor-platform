@@ -52,6 +52,11 @@ interface RequestFormValues {
 }
 
 export function RequestForm() {
+interface RequestFormProps {
+  initialPhone?: string;
+}
+
+export function RequestForm({ initialPhone = "" }: RequestFormProps) {
   const router = useRouter();
 
   const {
@@ -75,6 +80,7 @@ export function RequestForm() {
       disease: "",
       needed_time: "",
       contact_phone: "",
+      contact_phone: initialPhone,
       patient_note: "",
     },
   });
@@ -430,6 +436,8 @@ export function RequestForm() {
               <p className="text-xs text-muted-foreground">
                 Will only be revealed to verified donors who accept this
                 request.
+                This phone number will be displayed on the public request page
+                so donors and volunteers can call and coordinate immediately.
               </p>
             </div>
 

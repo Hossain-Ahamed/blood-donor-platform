@@ -31,6 +31,7 @@ import {
   ShieldAlert,
   Calendar,
   Sparkles,
+  Phone,
 } from "lucide-react";
 import type { DonorProfile, User as UserType, BloodGroup } from "@repo/shared";
 
@@ -41,6 +42,7 @@ type ProfileFormProps = {
 
 interface ProfileFormValues {
   name: string;
+  phone: string;
   blood_group: BloodGroup;
   date_of_birth: string;
   religion: string;
@@ -101,6 +103,7 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
   } = useForm<ProfileFormValues>({
     defaultValues: {
       name: initialData?.user?.name || initialUser?.name || "",
+      phone: initialData?.user?.phone || initialUser?.phone || "",
       blood_group:
         (initialData?.blood_group as BloodGroup) || ("O_POS" as BloodGroup),
       date_of_birth: initialDob,
@@ -131,6 +134,11 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       return;
     }
 
+    if (!data.phone.trim()) {
+      toast.error("Please enter your contact phone number");
+      return;
+    }
+
     if (data.lat === null || data.lng === null) {
       toast.error("Please select your location on the map or use GPS");
       return;
@@ -149,6 +157,7 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
     try {
       const payload: Record<string, unknown> = {
         name: data.name.trim(),
+        phone: data.phone.trim(),
         blood_group: data.blood_group,
         lat: Number(data.lat),
         lng: Number(data.lng),
@@ -204,6 +213,23 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                   placeholder="Enter your full name"
                   required
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="phone" className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                  Contact Phone Number <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  {...register("phone")}
+                  placeholder="e.g. +880 1700 000000 or 01700000000"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Required for emergency blood request coordination and donor contact.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
