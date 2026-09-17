@@ -27,12 +27,20 @@ import {
   RequesterResponsesCard,
   type RequesterDonorResponse,
 } from "./RequesterResponsesCard";
+import { RequesterInfoCard } from "./RequesterInfoCard";
 import type { BloodRequest, DonorProfile, User } from "@repo/shared";
 
 type BloodRequestDetail = BloodRequest & {
   location?: {
     type: string;
     coordinates: [number, number];
+  };
+  requester?: User;
+  requester_profile?: {
+    area_name?: string;
+    blood_group?: string;
+    is_available?: boolean;
+    last_donation_date?: string;
   };
 };
 
@@ -91,6 +99,8 @@ export default async function RequestDetailPage({
 
   const isOwnRequest = user?.id === request.requester_id;
   const isProfileComplete = Boolean(profile && profile.blood_group);
+  const userPhone = user?.phone?.trim() || profile?.user?.phone?.trim();
+  const hasPhone = Boolean(userPhone);
 
   let responses: RequesterDonorResponse[] = [];
   if (isOwnRequest || user?.role === "ADMIN") {
@@ -144,6 +154,12 @@ export default async function RequestDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          <RequesterInfoCard
+            requester={request.requester}
+            contactPhone={request.contact_phone}
+            requesterProfile={request.requester_profile}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Patient & Medical Details</CardTitle>
@@ -360,7 +376,7 @@ export default async function RequestDetailPage({
                   </CardContent>
                 </Card>
               ) : !isProfileComplete ? (
-                <Card className="sticky top-24">
+                <Card className="sticky top-24 shadow-sm">
                   <CardHeader>
                     <CardTitle>Can you help?</CardTitle>
                     <CardDescription>
@@ -388,13 +404,45 @@ export default async function RequestDetailPage({
                     </div>
                   </CardContent>
                 </Card>
+              ) : !hasPhone ? (
+                <Card className="sticky top-24 border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-amber-800 dark:text-amber-300">
+                      Contact Number Required
+                    </CardTitle>
+                    <CardDescription>
+                      Add your phone number to respond as a donor.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground text-center">
+                        Requesters need your direct phone number to coordinate
+                        urgently when accepting your blood donation offer.
+                      </p>
+                      <Link href={`/profile?redirect=/requests/${id}`}>
+                        <Button
+                          size="lg"
+                          className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                          Add Contact Number in Profile
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : (
                 <DonorResponseActionCard
                   requestId={id}
                   initialResponse={myResponse}
                   requestStatus={request.status}
-                  requesterContactPhone={request.contact_phone}
-                  requesterName={request.patient_name}
+                  requesterContactPhone={
+                    request.contact_phone || request.requester?.phone
+                  }
+                  requesterName={
+                    request.requester?.name || request.patient_name
+                  }
+                  donorPhone={userPhone}
                 />
               )}
             </>

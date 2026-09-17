@@ -30,7 +30,10 @@ import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: () => dataSourceOptions,
+      useFactory: () => ({
+        ...dataSourceOptions,
+        autoLoadEntities: true,
+      }),
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

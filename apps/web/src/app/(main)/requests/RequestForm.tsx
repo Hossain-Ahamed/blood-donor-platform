@@ -51,7 +51,11 @@ interface RequestFormValues {
   patient_note: string;
 }
 
-export function RequestForm() {
+interface RequestFormProps {
+  initialPhone?: string;
+}
+
+export function RequestForm({ initialPhone = "" }: RequestFormProps = {}) {
   const router = useRouter();
 
   const {
@@ -74,7 +78,7 @@ export function RequestForm() {
       patient_age: "",
       disease: "",
       needed_time: "",
-      contact_phone: "",
+      contact_phone: initialPhone || "",
       patient_note: "",
     },
   });

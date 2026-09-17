@@ -72,8 +72,11 @@ export class DonorProfilesService {
     userId: string,
     dto: UpsertDonorProfileDto,
   ): Promise<DonorProfile> {
-    if (dto.name) {
-      await this.userRepository.update(userId, { name: dto.name });
+    const userUpdates: Partial<User> = {};
+    if (dto.name) userUpdates.name = dto.name;
+    if (dto.phone !== undefined) userUpdates.phone = dto.phone;
+    if (Object.keys(userUpdates).length > 0) {
+      await this.userRepository.update(userId, userUpdates);
     }
 
     let profile = await this.donorProfileRepository.findOne({
@@ -133,8 +136,11 @@ export class DonorProfilesService {
     userId: string,
     dto: UpdateDonorProfileDto,
   ): Promise<DonorProfile> {
-    if (dto.name) {
-      await this.userRepository.update(userId, { name: dto.name });
+    const userUpdates: Partial<User> = {};
+    if (dto.name) userUpdates.name = dto.name;
+    if (dto.phone !== undefined) userUpdates.phone = dto.phone;
+    if (Object.keys(userUpdates).length > 0) {
+      await this.userRepository.update(userId, userUpdates);
     }
 
     const profile = await this.getMe(userId);

@@ -23,21 +23,30 @@ export default async function NewRequestPage() {
   }
 
   let profile: ProfileWithUser | null = null;
+  let user: User | null = null;
   try {
-    const profileRes = await apiServer.request<
-      { data: ProfileWithUser } | ProfileWithUser
-    >("/donor-profiles/me");
-    if (profileRes) {
+    const [profileRes, userRes] = await Promise.allSettled([
+      apiServer.request<{ data: ProfileWithUser } | ProfileWithUser>(
+        "/donor-profiles/me",
+      ),
+      apiServer.request<{ data: User } | User>("/users/me"),
+    ]);
+    if (profileRes.status === "fulfilled" && profileRes.value) {
+      const val = profileRes.value;
       profile =
-        "data" in profileRes && profileRes.data
-          ? profileRes.data
-          : (profileRes as ProfileWithUser);
+        "data" in val && val.data ? val.data : (val as ProfileWithUser);
+    }
+    if (userRes.status === "fulfilled" && userRes.value) {
+      const val = userRes.value;
+      user = "data" in val && val.data ? val.data : (val as User);
     }
   } catch (error) {
     console.error("Error checking donor profile for new request page:", error);
   }
 
   const isProfileComplete = Boolean(profile && profile.blood_group);
+  const userPhone = user?.phone?.trim() || profile?.user?.phone?.trim();
+  const hasPhone = Boolean(userPhone);
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-3xl">
@@ -77,8 +86,35 @@ export default async function NewRequestPage() {
             </div>
           </CardContent>
         </Card>
+      ) : !hasPhone ? (
+        <Card className="max-w-xl mx-auto shadow-sm border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="text-amber-800 dark:text-amber-300">
+              Contact Number Required
+            </CardTitle>
+            <CardDescription>
+              You must provide a contact phone number to create a blood request.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground text-center">
+                Potential donors need your contact phone number to reach you
+                immediately and coordinate the donation.
+              </p>
+              <Link href="/profile?redirect=/requests/new">
+                <Button
+                  size="lg"
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  Add Contact Number in Profile
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
-        <RequestForm />
+        <RequestForm initialPhone={userPhone} />
       )}
     </div>
   );

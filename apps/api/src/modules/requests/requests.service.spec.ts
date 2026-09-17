@@ -3,6 +3,7 @@ import { RequestsService } from "./requests.service";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { BloodRequest } from "../../entities/request.entity";
+import { User } from "../../entities/user.entity";
 import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
 import { DonorProfilesService } from "../donor-profiles/donor-profiles.service";
 import { RequestStatus, BloodGroup } from "@repo/shared";
@@ -12,6 +13,7 @@ describe("RequestsService", () => {
   let cacheManagerMock: any;
   let queryBuilderMock: any;
   let requestRepositoryMock: any;
+  let userRepositoryMock: any;
 
   beforeEach(async () => {
     cacheManagerMock = {
@@ -41,12 +43,20 @@ describe("RequestsService", () => {
       softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
+    userRepositoryMock = {
+      findOne: jest.fn().mockResolvedValue({ id: "user-1", phone: "01900000000" }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RequestsService,
         {
           provide: getRepositoryToken(BloodRequest),
           useValue: requestRepositoryMock,
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: userRepositoryMock,
         },
         {
           provide: CACHE_MANAGER,

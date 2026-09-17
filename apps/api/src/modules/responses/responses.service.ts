@@ -25,6 +25,8 @@ export class ResponsesService {
     private readonly donationRepository: Repository<Donation>,
     @InjectRepository(DonorProfile)
     private readonly donorProfileRepository: Repository<DonorProfile>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly pushSubscriptionsService: PushSubscriptionsService,
   ) {}
 
@@ -33,6 +35,13 @@ export class ResponsesService {
     donorId: string,
     message?: string,
   ): Promise<Response> {
+    const donor = await this.userRepository.findOne({ where: { id: donorId } });
+    if (!donor?.phone?.trim()) {
+      throw new BadRequestException(
+        "You must have a contact phone number in your profile to respond to blood requests",
+      );
+    }
+
     const request = await this.requestRepository.findOne({
       where: { id: requestId },
     });

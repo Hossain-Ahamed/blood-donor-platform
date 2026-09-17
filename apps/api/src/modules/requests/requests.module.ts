@@ -3,13 +3,14 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { RequestsService } from "./requests.service";
 import { RequestsController } from "./requests.controller";
 import { BloodRequest } from "../../entities/request.entity";
+import { User } from "../../entities/user.entity";
 
 import { PushSubscriptionsModule } from "../push-subscriptions/push-subscriptions.module";
 import { DonorProfilesModule } from "../donor-profiles/donor-profiles.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BloodRequest]),
+    TypeOrmModule.forFeature([BloodRequest, User]),
     PushSubscriptionsModule,
     DonorProfilesModule,
   ],

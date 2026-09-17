@@ -9,6 +9,11 @@ export class UpsertDonorProfileDto {
   @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   name?: string;
 
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  phone?: string;
+
   @IsEnum(BloodGroup)
   blood_group: BloodGroup;
 
@@ -54,6 +59,11 @@ export class UpdateDonorProfileDto {
   @IsOptional()
   @Transform(({ value }) => value ? sanitizeHtml(value) : value)
   name?: string;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value ? sanitizeHtml(value) : value)
+  phone?: string;
 
   @IsEnum(BloodGroup)
   @IsOptional()

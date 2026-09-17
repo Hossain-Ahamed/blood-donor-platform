@@ -123,6 +123,7 @@ export const BloodRequestSchema = z.object({
   created_at: z.date(),
   updated_at: z.date(),
   deleted_at: z.date().nullable().optional(),
+  requester: UserSchema.partial().nullable().optional(),
 });
 export type BloodRequest = z.infer<typeof BloodRequestSchema>;
 

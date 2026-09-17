@@ -31,6 +31,7 @@ import {
   ShieldAlert,
   Calendar,
   Sparkles,
+  Phone,
 } from "lucide-react";
 import type { DonorProfile, User as UserType, BloodGroup } from "@repo/shared";
 
@@ -41,6 +42,7 @@ type ProfileFormProps = {
 
 interface ProfileFormValues {
   name: string;
+  phone: string;
   blood_group: BloodGroup;
   date_of_birth: string;
   religion: string;
@@ -102,6 +104,7 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
   } = useForm<ProfileFormValues>({
     defaultValues: {
       name: initialData?.user?.name || initialUser?.name || "",
+      phone: initialUser?.phone || initialData?.user?.phone || "",
       blood_group:
         (initialData?.blood_group as BloodGroup) || ("O_POS" as BloodGroup),
       date_of_birth: initialDob,
@@ -132,6 +135,11 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       return;
     }
 
+    if (!data.phone.trim()) {
+      toast.error("Please enter your contact phone number");
+      return;
+    }
+
     if (data.lat === null || data.lng === null) {
       toast.error("Please select your location on the map or use GPS");
       return;
@@ -150,6 +158,7 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
     try {
       const payload: Record<string, unknown> = {
         name: data.name.trim(),
+        phone: data.phone.trim(),
         blood_group: data.blood_group,
         lat: Number(data.lat),
         lng: Number(data.lng),
@@ -162,10 +171,19 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
         last_donation_date: data.last_donation_date || undefined,
       };
 
-      await apiClient.request("/donor-profiles", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      await Promise.all([
+        apiClient.request("/donor-profiles", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+        apiClient.request("/users/me", {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: data.name.trim(),
+            phone: data.phone.trim(),
+          }),
+        }),
+      ]);
 
       toast.success("Profile updated successfully!");
       const redirectUrl = searchParams.get("redirect");
@@ -210,6 +228,26 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                   placeholder="Enter your full name"
                   required
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="phone">
+                  Contact Phone Number <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    className="pl-9"
+                    {...register("phone")}
+                    placeholder="e.g. 01712345678 or +8801712345678"
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Required for emergency blood requests and donor coordination.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -11,6 +11,7 @@ import { Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
 import { BloodRequest } from "../../entities/request.entity";
+import { User } from "../../entities/user.entity";
 import {
   CreateRequestDto,
   UpdateRequestDto,
@@ -29,6 +30,8 @@ export class RequestsService {
   constructor(
     @InjectRepository(BloodRequest)
     private readonly requestRepository: Repository<BloodRequest>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly pushSubscriptionsService: PushSubscriptionsService,
     private readonly donorProfilesService: DonorProfilesService,
@@ -41,6 +44,16 @@ export class RequestsService {
         "You must complete your profile with your blood group and location before creating a blood request",
       );
     }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userPhone = user?.phone?.trim() || userProfile.user?.phone?.trim();
+    if (!userPhone) {
+      throw new BadRequestException(
+        "You must add a contact phone number to your profile before creating a blood request",
+      );
+    }
+
+    const contactPhone = dto.contact_phone?.trim() || userPhone;
 
     const location: Point = {
       type: "Point",
@@ -64,7 +77,7 @@ export class RequestsService {
       disease: dto.disease,
       needed_time: dto.needed_time ? new Date(dto.needed_time) : undefined,
       patient_note: dto.patient_note,
-      contact_phone: dto.contact_phone,
+      contact_phone: contactPhone,
       expires_at: expiresAt,
       status: RequestStatus.OPEN,
     });

@@ -41,6 +41,7 @@ interface DonorResponseActionCardProps {
   requestStatus: string;
   requesterContactPhone?: string | null;
   requesterName?: string | null;
+  donorPhone?: string | null;
 }
 
 export function DonorResponseActionCard({
@@ -49,6 +50,7 @@ export function DonorResponseActionCard({
   requestStatus,
   requesterContactPhone,
   requesterName,
+  donorPhone,
 }: DonorResponseActionCardProps) {
   const router = useRouter();
   const [response, setResponse] = useState<DonorResponse | null>(
@@ -63,6 +65,15 @@ export function DonorResponseActionCard({
 
   const handleDonate = async () => {
     if (isSubmitting) return;
+
+    if (!donorPhone?.trim()) {
+      toast.error(
+        "Please add a contact phone number to your profile before responding.",
+      );
+      router.push(`/profile?redirect=/requests/${requestId}`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
