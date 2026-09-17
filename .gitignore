@@ -6,4 +6,5 @@ coverage
 .turbo
 DATABSE.md
 PROJECT_PLAN.md
+.pnpm-store
 
