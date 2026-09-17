@@ -384,7 +384,7 @@ export default async function RequestDetailPage({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Form Contact Phone
+                    Patient / Attendant Contact
                   </p>
                   {request.contact_phone ? (
                     <a
@@ -527,7 +527,7 @@ export default async function RequestDetailPage({
                     {request.contact_phone && (
                       <div className="rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-3.5 text-center space-y-2">
                         <span className="text-xs text-muted-foreground font-medium block">
-                          Form Contact Phone (Public):
+                          Patient / Attendant Contact:
                         </span>
                         <a
                           href={`tel:${request.contact_phone}`}

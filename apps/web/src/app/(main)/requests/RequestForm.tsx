@@ -422,7 +422,7 @@ export function RequestForm({ initialPhone = "" }: RequestFormProps = {}) {
 
             <div className="grid gap-2">
               <Label htmlFor="phone">
-                Contact Phone Number <span className="text-red-500">*</span>
+                Patient / Attendant Contact Phone <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="phone"
@@ -432,7 +432,7 @@ export function RequestForm({ initialPhone = "" }: RequestFormProps = {}) {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                This phone number will be displayed on the request page so donors and volunteers can call and coordinate immediately.
+                This phone number will be displayed on the request page so donors and volunteers can call the patient or attendant immediately.
               </p>
             </div>
 
