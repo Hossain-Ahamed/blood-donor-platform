@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { apiServer } from "@/lib/api/server";
 import { AdminNav } from "./AdminNav";
 import { UserNav } from "@/components/UserNav";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default async function AdminLayout({
   children,
@@ -33,8 +34,11 @@ export default async function AdminLayout({
           <AdminNav />
         </nav>
         <div className="p-4 border-t">
-          <div className="flex items-center gap-3">
-            <UserNav user={user} isAdminLayout={true} />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <UserNav user={user} isAdminLayout={true} />
+            </div>
             <div className="text-sm font-medium">Admin User</div>
           </div>
         </div>

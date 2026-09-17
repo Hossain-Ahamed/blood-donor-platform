@@ -8,6 +8,7 @@ import { Donation } from "../../entities/donation.entity";
 import { DonorProfile } from "../../entities/donor-profile.entity";
 import { User } from "../../entities/user.entity";
 import { PushSubscriptionsModule } from "../push-subscriptions/push-subscriptions.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { PushSubscriptionsModule } from "../push-subscriptions/push-subscription
       User,
     ]),
     PushSubscriptionsModule,
+    NotificationsModule,
   ],
   controllers: [ResponsesController],
   providers: [ResponsesService],

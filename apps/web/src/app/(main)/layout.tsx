@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { apiServer } from "@/lib/api/server";
 import { MainNav } from "@/components/MainNav";
 import { UserNav } from "@/components/UserNav";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default async function MainLayout({
   children,
@@ -33,9 +34,12 @@ export default async function MainLayout({
 
         <MainNav />
 
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-3">
           {user ? (
-            <UserNav user={user} />
+            <>
+              <NotificationBell />
+              <UserNav user={user} />
+            </>
           ) : (
             <Link
               href="/login"

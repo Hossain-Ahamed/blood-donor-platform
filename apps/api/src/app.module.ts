@@ -7,6 +7,7 @@ import { ReportsModule } from "./modules/reports/reports.module";
 import { AuditLogsModule } from "./modules/audit-logs/audit-logs.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { PushSubscriptionsModule } from "./modules/push-subscriptions/push-subscriptions.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -58,6 +59,7 @@ import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
     AuditLogsModule,
     AdminModule,
     PushSubscriptionsModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [
