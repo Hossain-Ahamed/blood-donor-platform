@@ -1,6 +1,13 @@
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { RequestForm } from "../RequestForm";
 
-export default function NewRequestPage() {
+export default async function NewRequestPage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("access_token")?.value;
+  if (!token) {
+    redirect("/login?redirect=/requests/new");
+  }
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-3xl">
       <div className="mb-8">

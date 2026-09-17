@@ -13,4 +13,9 @@ export class CreateResponseDto {
 export class UpdateResponseDto {
   @IsEnum(ResponseStatus)
   status: ResponseStatus;
+
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => (value ? sanitizeHtml(value) : value))
+  rejection_reason?: string;
 }

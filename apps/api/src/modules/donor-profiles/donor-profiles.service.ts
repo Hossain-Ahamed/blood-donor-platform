@@ -9,7 +9,9 @@ import {
 } from "./dto/donor-profile.dto";
 import { Point } from "geojson";
 
-export function calculateAge(dob: string | Date | null | undefined): number | null {
+export function calculateAge(
+  dob: string | Date | null | undefined,
+): number | null {
   if (!dob) return null;
   const birthDate = new Date(dob);
   if (isNaN(birthDate.getTime())) return null;
@@ -29,7 +31,7 @@ export class DonorProfilesService {
     private readonly donorProfileRepository: Repository<DonorProfile>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) { }
+  ) {}
 
   private calculateAvailability(
     lastDonationDate: string | Date | undefined,
@@ -55,6 +57,17 @@ export class DonorProfilesService {
     return profile;
   }
 
+  async findByUserId(userId: string): Promise<DonorProfile | null> {
+    const profile = await this.donorProfileRepository.findOne({
+      where: { user_id: userId },
+      relations: ["user"],
+    });
+    if (profile && profile.date_of_birth) {
+      profile.age = calculateAge(profile.date_of_birth) ?? profile.age;
+    }
+    return profile;
+  }
+
   async upsert(
     userId: string,
     dto: UpsertDonorProfileDto,
@@ -75,7 +88,7 @@ export class DonorProfilesService {
 
     const isAvailable = this.calculateAvailability(dto.last_donation_date);
     const dob = dto.date_of_birth ? new Date(dto.date_of_birth) : undefined;
-    const computedAge = dob ? calculateAge(dob) ?? dto.age : dto.age;
+    const computedAge = dob ? (calculateAge(dob) ?? dto.age) : dto.age;
 
     if (profile) {
       profile.blood_group = dto.blood_group;
@@ -84,7 +97,8 @@ export class DonorProfilesService {
       if (dob !== undefined) profile.date_of_birth = dob;
       if (computedAge !== undefined) profile.age = computedAge;
       if (dto.religion !== undefined) profile.religion = dto.religion;
-      if (dto.health_notes !== undefined) profile.health_notes = dto.health_notes;
+      if (dto.health_notes !== undefined)
+        profile.health_notes = dto.health_notes;
       if (dto.bio !== undefined) profile.bio = dto.bio;
       if (dto.last_donation_date !== undefined) {
         profile.last_donation_date = new Date(dto.last_donation_date);
@@ -128,7 +142,9 @@ export class DonorProfilesService {
     if (dto.blood_group) profile.blood_group = dto.blood_group;
     if (dto.area_name) profile.area_name = dto.area_name;
     if (dto.date_of_birth !== undefined) {
-      profile.date_of_birth = dto.date_of_birth ? new Date(dto.date_of_birth) : (null as any);
+      profile.date_of_birth = dto.date_of_birth
+        ? new Date(dto.date_of_birth)
+        : (null as any);
       profile.age = calculateAge(profile.date_of_birth) ?? profile.age;
     } else if (dto.age !== undefined) {
       profile.age = dto.age;

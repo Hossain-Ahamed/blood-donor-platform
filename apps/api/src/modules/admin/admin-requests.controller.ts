@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -27,9 +28,14 @@ export class AdminRequestsController {
   @Patch(":id")
   async update(
     @Param("id") id: string,
-    @Body() updateData: { status: string },
+    @Body() updateData: any,
     @CurrentUser() admin: User,
   ) {
     return this.requestsService.update(admin.id, id, updateData);
+  }
+
+  @Delete(":id")
+  async delete(@Param("id") id: string, @CurrentUser() admin: User) {
+    return this.requestsService.delete(admin.id, id);
   }
 }

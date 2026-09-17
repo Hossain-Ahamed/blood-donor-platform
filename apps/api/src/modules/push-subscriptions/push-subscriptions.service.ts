@@ -77,13 +77,14 @@ export class PushSubscriptionsService {
 
     try {
       await webpush.sendNotification(pushSub, JSON.stringify(payload));
-    } catch (error) {
+      this.logger.log(`Push notification sent successfully to endpoint: ${subscription.endpoint.substring(0, 45)}...`);
+    } catch (error: any) {
       this.logger.error(
-        `Failed to send push notification to ${subscription.endpoint}:`,
-        error,
+        `Failed to send push notification to ${subscription.endpoint.substring(0, 45)}...: ${error.message}`,
       );
       if (error.statusCode === 410 || error.statusCode === 404) {
         // Subscription has expired or is no longer valid
+        this.logger.warn(`Push subscription expired/invalid (status ${error.statusCode}), deleting from database.`);
         await this.pushSubscriptionRepository.delete(subscription.id);
       }
     }
@@ -91,6 +92,12 @@ export class PushSubscriptionsService {
 
   async notifyUsers(userIds: string[], payload: any): Promise<void> {
     const subscriptions = await this.findSubscriptionsForUsers(userIds);
+    this.logger.log(`Found ${subscriptions.length} push subscription(s) for ${userIds.length} user(s)`);
+
+    if (subscriptions.length === 0) {
+      this.logger.log(`None of the target users have active push subscriptions`);
+      return;
+    }
 
     // Fire and forget
     Promise.all(

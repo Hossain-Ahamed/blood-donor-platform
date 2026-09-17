@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { BloodGroup, RequestStatus } from "@repo/shared";
 import {
@@ -11,13 +13,7 @@ import {
   componentTypeLabels,
   getLabel,
 } from "@/lib/labels";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -45,7 +41,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Hospital,
   User as UserIcon,
   Phone,
   Eye,
@@ -55,9 +50,14 @@ import {
   Filter,
   Check,
   ShieldCheck,
+  Edit3,
+  Trash2,
+  Search,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { RequestEditDialog } from "@/components/RequestEditDialog";
 import type { MapMarkerItem } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), {
@@ -132,118 +132,269 @@ function formatDistance(distanceKm: number): string {
   return `${distanceKm.toFixed(1)} km away`;
 }
 
-export default function AdminRequestsPage() {
-  const [requests, setRequests] = useState<RequestWithRequester[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
+function AdminRequestsContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const queryClient = useQueryClient();
 
-  // Filters
-  const [status, setStatus] = useState<string>("all");
-  const [bloodGroup, setBloodGroup] = useState<string>("all");
-  const [radiusKm, setRadiusKm] = useState<string>("25");
-  // Default to showing all locations normally for admin
-  const [useRadiusFilter, setUseRadiusFilter] = useState<boolean>(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  // Read state from URL search parameters (reload-safe)
+  const page = parseInt(searchParams.get("page") || "1", 10);
+  const status = searchParams.get("status") || "all";
+  const bloodGroup = searchParams.get("blood_group") || "all";
+  const radiusKm = searchParams.get("radiusKm") || "25";
+  const useRadiusFilter = searchParams.get("use_radius") === "true";
+  const requestIdParam = searchParams.get("requestId") || "";
+  const locationSource =
+    (searchParams.get("source") as "profile" | "gps" | "custom" | "all") ||
+    (useRadiusFilter ? "custom" : "all");
 
-  // Location state
-  const [center, setCenter] = useState<[number, number]>([23.7925, 90.4078]);
-  const [locationSource, setLocationSource] = useState<
-    "profile" | "gps" | "custom" | "all"
-  >("all");
-  const [profileLocation, setProfileLocation] = useState<
-    [number, number] | null
-  >(null);
-  const [profileAreaName, setProfileAreaName] = useState<string | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
+  const latParam = searchParams.get("lat");
+  const lngParam = searchParams.get("lng");
+  const center: [number, number] = useMemo(() => {
+    if (latParam && lngParam) {
+      const lat = parseFloat(latParam);
+      const lng = parseFloat(lngParam);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return [lat, lng];
+      }
+    }
+    return [23.7925, 90.4078];
+  }, [latParam, lngParam]);
 
-  // Request Details Dialog & Action State
+  // Sync state changes directly to URL parameters
+  const updateParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (
+          value === null ||
+          value === undefined ||
+          value === "" ||
+          (key === "page" && value === "1") ||
+          (key === "status" && value === "all") ||
+          (key === "blood_group" && value === "all") ||
+          (key === "use_radius" && value === "false") ||
+          (key === "source" && value === "all") ||
+          (key === "requestId" && (!value || value === ""))
+        ) {
+          nextParams.delete(key);
+        } else {
+          nextParams.set(key, value);
+        }
+      }
+      const qs = nextParams.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, router, pathname],
+  );
+
+  // Local UI state
   const [selectedRequest, setSelectedRequest] =
     useState<RequestWithRequester | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [searchIdInput, setSearchIdInput] = useState(requestIdParam);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
-  // Fetch admin profile to check for saved DB location
-  useEffect(() => {
-    async function loadAdminProfile() {
+  // 1. Fetch admin profile location via TanStack Query
+  const { data: profileLocationData } = useQuery({
+    queryKey: ["admin", "profile-location"],
+    queryFn: async () => {
       try {
-        const res = await apiClient.request<any>("/donor-profiles/me");
-        const profile = res?.data || res;
+        const res = await apiClient.request<{
+          data?: {
+            location?: {
+              type?: string;
+              coordinates?: [number, number];
+              lat?: number;
+              lng?: number;
+            };
+            area_name?: string;
+          };
+          location?: {
+            type?: string;
+            coordinates?: [number, number];
+            lat?: number;
+            lng?: number;
+          };
+          area_name?: string;
+        }>("/donor-profiles/me");
+
+        const profile = res && "data" in res && res.data ? res.data : res;
         if (profile?.location) {
           const loc = profile.location;
           let coords: [number, number] | null = null;
           if (Array.isArray(loc.coordinates) && loc.coordinates.length === 2) {
             coords = [loc.coordinates[1], loc.coordinates[0]];
-          } else if (typeof loc.lat === "number" && typeof loc.lng === "number") {
+          } else if (
+            typeof loc.lat === "number" &&
+            typeof loc.lng === "number"
+          ) {
             coords = [loc.lat, loc.lng];
           }
           if (coords) {
-            setProfileLocation(coords);
-            setProfileAreaName(profile.area_name || null);
+            return { coords, areaName: profile.area_name || null };
           }
         }
+        return null;
       } catch {
-        // Admin has no donor profile or not created yet
-      }
-    }
-    loadAdminProfile();
-  }, []);
-
-  // Fetch Requests
-  const fetchRequests = useCallback(
-    async (
-      currentPage = page,
-      currentStatus = status,
-      currentBloodGroup = bloodGroup,
-      currentCenter = center,
-      applyRadius = useRadiusFilter,
-      currentRadius = radiusKm,
-    ) => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({
-          page: currentPage.toString(),
-          limit: "20",
-        });
-
-        if (currentStatus !== "all") params.append("status", currentStatus);
-        if (currentBloodGroup !== "all") {
-          params.append("blood_group", currentBloodGroup);
-        }
-
-        if (applyRadius) {
-          // Cap radius at max 200 km
-          const cappedRadius = Math.min(200, Math.max(1, parseFloat(currentRadius) || 25));
-          params.append("lat", currentCenter[0].toString());
-          params.append("lng", currentCenter[1].toString());
-          params.append("radiusKm", cappedRadius.toString());
-        }
-
-        const response = await apiClient.request<
-          PaginatedResponse<RequestWithRequester>
-        >(`/admin/requests?${params.toString()}`);
-
-        const data = (response as any).data?.data
-          ? (response as any).data
-          : response;
-
-        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-        setRequests(list);
-        setTotalCount(data?.meta?.total ?? list.length);
-        setTotalPages(data?.meta?.totalPages ?? 1);
-      } catch (error: any) {
-        toast.error(error.message || "Failed to fetch requests");
-      } finally {
-        setLoading(false);
+        return null;
       }
     },
-    [page, status, bloodGroup, center, useRadiusFilter, radiusKm],
-  );
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Trigger fetch on filter change
-  useEffect(() => {
-    fetchRequests(page, status, bloodGroup, center, useRadiusFilter, radiusKm);
-  }, [page, status, bloodGroup, useRadiusFilter, radiusKm, center, fetchRequests]);
+  const profileLocation = profileLocationData?.coords ?? null;
+  const profileAreaName = profileLocationData?.areaName ?? null;
+
+  // 2. Fetch requests via TanStack Query
+  const {
+    data: requestsData,
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      "admin-requests",
+      {
+        page,
+        status,
+        bloodGroup,
+        center,
+        useRadiusFilter,
+        radiusKm,
+        requestId: requestIdParam,
+      },
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "20",
+      });
+
+      if (requestIdParam) {
+        params.append("requestId", requestIdParam.trim());
+      }
+      if (status !== "all") params.append("status", status);
+      if (bloodGroup !== "all") {
+        params.append("blood_group", bloodGroup);
+      }
+
+      if (useRadiusFilter) {
+        const cappedRadius = Math.min(
+          200,
+          Math.max(1, parseFloat(radiusKm) || 25),
+        );
+        params.append("lat", center[0].toString());
+        params.append("lng", center[1].toString());
+        params.append("radiusKm", cappedRadius.toString());
+      }
+
+      const response = await apiClient.request<
+        | PaginatedResponse<RequestWithRequester>
+        | {
+            data:
+              PaginatedResponse<RequestWithRequester> | RequestWithRequester[];
+          }
+      >(`/admin/requests?${params.toString()}`);
+
+      const responseData = "data" in response ? response.data : response;
+      const list: RequestWithRequester[] = Array.isArray(responseData)
+        ? responseData
+        : Array.isArray(
+              (responseData as PaginatedResponse<RequestWithRequester>)?.data,
+            )
+          ? (responseData as PaginatedResponse<RequestWithRequester>).data
+          : [];
+
+      const meta =
+        "meta" in response
+          ? response.meta
+          : responseData &&
+              typeof responseData === "object" &&
+              "meta" in responseData
+            ? (responseData as PaginatedResponse<RequestWithRequester>).meta
+            : undefined;
+
+      return {
+        requests: list,
+        totalCount: meta?.total ?? list.length,
+        totalPages: meta?.totalPages ?? 1,
+      };
+    },
+  });
+
+  const requests = requestsData?.requests ?? [];
+  const totalCount = requestsData?.totalCount ?? 0;
+  const totalPages = requestsData?.totalPages ?? 1;
+
+  // 3. Status update mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({
+      id,
+      newStatus,
+    }: {
+      id: string;
+      newStatus: RequestStatus;
+    }) => {
+      return apiClient.request(`/admin/requests/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+    },
+    onSuccess: (_, variables) => {
+      const label = getLabel(requestStatusLabels, variables.newStatus);
+      toast.success(`Request status updated to ${label}`);
+      setSelectedRequest((prev) =>
+        prev && prev.id === variables.id
+          ? { ...prev, status: variables.newStatus }
+          : prev,
+      );
+      setIsDetailDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
+    },
+    onError: (error: unknown) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update request status",
+      );
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiClient.request(`/admin/requests/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Request deleted successfully");
+      setIsDeleteDialogOpen(false);
+      setIsDetailDialogOpen(false);
+      setSelectedRequest(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
+    },
+    onError: (error: unknown) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete request",
+      );
+    },
+  });
+
+  const actionLoading =
+    updateStatusMutation.isPending || deleteMutation.isPending;
+
+  const handleUpdateStatus = (newStatus: RequestStatus) => {
+    if (!selectedRequest) return;
+    updateStatusMutation.mutate({ id: selectedRequest.id, newStatus });
+  };
+
+  const handleDeleteRequest = () => {
+    if (!selectedRequest) return;
+    deleteMutation.mutate(selectedRequest.id);
+  };
 
   // Radius change with 200 km max limit enforcement
   const handleRadiusChange = (val: string) => {
@@ -253,8 +404,7 @@ export default function AdminRequestsPage() {
       num = 200;
       toast.info("Maximum range is limited to 200 km.");
     }
-    setRadiusKm(num.toString());
-    setPage(1);
+    updateParams({ radiusKm: num.toString(), page: "1" });
   };
 
   // GPS Geolocation trigger
@@ -268,13 +418,15 @@ export default function AdminRequestsPage() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setIsLocating(false);
-        const newCoords: [number, number] = [
-          pos.coords.latitude,
-          pos.coords.longitude,
-        ];
-        setCenter(newCoords);
-        setLocationSource("gps");
-        setUseRadiusFilter(true);
+        const lat = pos.coords.latitude.toFixed(5);
+        const lng = pos.coords.longitude.toFixed(5);
+        updateParams({
+          lat,
+          lng,
+          source: "gps",
+          use_radius: "true",
+          page: "1",
+        });
         toast.success("Location set to your Current GPS Location");
       },
       (error) => {
@@ -291,55 +443,36 @@ export default function AdminRequestsPage() {
       toast.error("No saved location found in profile");
       return;
     }
-    setCenter(profileLocation);
-    setLocationSource("profile");
-    setUseRadiusFilter(true);
+    updateParams({
+      lat: profileLocation[0].toString(),
+      lng: profileLocation[1].toString(),
+      source: "profile",
+      use_radius: "true",
+      page: "1",
+    });
     toast.success("Location set to your Saved Profile Location");
   };
 
   const handleShowAllWorldwide = () => {
-    setUseRadiusFilter(false);
-    setLocationSource("all");
+    updateParams({
+      use_radius: "false",
+      source: "all",
+      lat: null,
+      lng: null,
+      page: "1",
+    });
     toast.info("Showing requests normally from all locations");
   };
 
   const handleMapClick = (pos: [number, number]) => {
-    setCenter(pos);
-    setLocationSource("custom");
-    setUseRadiusFilter(true);
+    updateParams({
+      lat: pos[0].toFixed(5),
+      lng: pos[1].toFixed(5),
+      source: "custom",
+      use_radius: "true",
+      page: "1",
+    });
     toast.info("Updated admin search center from map.");
-  };
-
-  // Status update action (Approve, Cancel, Fulfill)
-  const handleUpdateStatus = async (newStatus: RequestStatus) => {
-    if (!selectedRequest) return;
-
-    setActionLoading(true);
-    try {
-      await apiClient.request(`/admin/requests/${selectedRequest.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      const label = getLabel(requestStatusLabels, newStatus);
-      toast.success(`Request status updated to ${label}`);
-
-      // Update in local state
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === selectedRequest.id ? { ...r, status: newStatus } : r,
-        ),
-      );
-      setSelectedRequest((prev) =>
-        prev ? { ...prev, status: newStatus } : null,
-      );
-      setIsDetailDialogOpen(false);
-      fetchRequests();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update request status");
-    } finally {
-      setActionLoading(false);
-    }
   };
 
   // Calculate distance for all requests
@@ -376,10 +509,7 @@ export default function AdminRequestsPage() {
     )
     .map((r) => ({
       id: r.id,
-      position: [
-        r.location!.coordinates[1],
-        r.location!.coordinates[0],
-      ],
+      position: [r.location!.coordinates[1], r.location!.coordinates[0]],
       title: `Need ${getLabel(bloodGroupLabels, r.blood_group)}`,
       description: r.hospital_name
         ? `${r.hospital_name} (${r.area_name})`
@@ -438,7 +568,8 @@ export default function AdminRequestsPage() {
               </Badge>
             </div>
             <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-              Review, verify, approve, fulfill, or cancel emergency blood requests.
+              Review, verify, approve, fulfill, or cancel emergency blood
+              requests.
             </p>
           </div>
 
@@ -462,13 +593,15 @@ export default function AdminRequestsPage() {
                 type="button"
                 onClick={handleUseSavedLocation}
                 className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  locationSource === "profile" && useRadiusFilter
-                    ? "bg-white dark:bg-zinc-800 text-red-600 dark:text-red-400 shadow-sm border border-border/60"
+                  useRadiusFilter && locationSource === "profile"
+                    ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-border/60"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
                 }`}
               >
-                <Home className="w-3.5 h-3.5 text-red-500" />
-                <span>Saved Location</span>
+                <Home className="w-3.5 h-3.5" />
+                <span className="truncate max-w-[160px] sm:max-w-none">
+                  {profileAreaName || "Saved"}
+                </span>
               </button>
             )}
 
@@ -477,7 +610,7 @@ export default function AdminRequestsPage() {
               onClick={handleDetectGps}
               disabled={isLocating}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                locationSource === "gps" && useRadiusFilter
+                useRadiusFilter && locationSource === "gps"
                   ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm border border-border/60"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
               }`}
@@ -485,7 +618,7 @@ export default function AdminRequestsPage() {
               {isLocating ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
               ) : (
-                <Navigation className="w-3.5 h-3.5 text-blue-500" />
+                <Navigation className="w-3.5 h-3.5" />
               )}
               <span>GPS Location</span>
             </button>
@@ -495,16 +628,85 @@ export default function AdminRequestsPage() {
         {/* Filters Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60">
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto flex-1">
+            {/* Search by Request ID */}
+            <div className="flex items-center gap-1.5 min-w-56 max-w-sm flex-1">
+              <Label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                ID:
+              </Label>
+              <div className="relative w-full">
+                <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  type="text"
+                  placeholder="Search Request ID (UUID)..."
+                  value={searchIdInput}
+                  onChange={(e) => setSearchIdInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      updateParams({
+                        requestId: searchIdInput.trim() || null,
+                        page: "1",
+                      });
+                    }
+                  }}
+                  className="h-9 text-xs pl-8 pr-7 font-mono bg-background"
+                />
+                {searchIdInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchIdInput("");
+                      updateParams({ requestId: null, page: "1" });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs p-0.5"
+                    title="Clear ID filter"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-9 px-3 text-xs font-semibold shrink-0"
+                onClick={() =>
+                  updateParams({
+                    requestId: searchIdInput.trim() || null,
+                    page: "1",
+                  })
+                }
+              >
+                Search
+              </Button>
+            </div>
+
+            {requestIdParam && (
+              <Badge
+                variant="outline"
+                className="h-8 px-2.5 text-xs border-red-300 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 flex items-center gap-1.5 cursor-pointer font-mono"
+                onClick={() => {
+                  setSearchIdInput("");
+                  updateParams({ requestId: null, page: "1" });
+                }}
+                title="Click to clear ID filter"
+              >
+                <span>ID: {requestIdParam.substring(0, 8)}...</span>
+                <span className="font-bold">✕</span>
+              </Badge>
+            )}
+
             {/* Status Select */}
-            <div className="flex items-center gap-2 min-w-[150px]">
+            <div className="flex items-center gap-2 min-w-37.5">
               <Label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                 Status:
               </Label>
               <Select
                 value={status}
                 onValueChange={(val: string | null) => {
-                  setStatus(val || "all");
-                  setPage(1);
+                  updateParams({
+                    status: !val || val === "all" ? null : val,
+                    page: "1",
+                  });
                 }}
               >
                 <SelectTrigger className="h-9 w-full bg-background">
@@ -528,15 +730,17 @@ export default function AdminRequestsPage() {
             </div>
 
             {/* Blood Group Select */}
-            <div className="flex items-center gap-2 min-w-[150px]">
+            <div className="flex items-center gap-2 min-w-37.5">
               <Label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                 Group:
               </Label>
               <Select
                 value={bloodGroup}
                 onValueChange={(val: string | null) => {
-                  setBloodGroup(val || "all");
-                  setPage(1);
+                  updateParams({
+                    blood_group: !val || val === "all" ? null : val,
+                    page: "1",
+                  });
                 }}
               >
                 <SelectTrigger className="h-9 w-full bg-background">
@@ -602,7 +806,7 @@ export default function AdminRequestsPage() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => fetchRequests()}
+              onClick={() => refetch()}
               disabled={loading}
               className="h-9 text-xs font-semibold"
             >
@@ -620,7 +824,7 @@ export default function AdminRequestsPage() {
       {/* Main Content: Left Requests List + Right Interactive Map */}
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Left Side: Requests Cards List */}
-        <div className="w-full lg:w-5/12 flex flex-col gap-3 overflow-y-auto pr-1">
+        <div className="w-full lg:w-5/12 flex flex-col gap-3 overflow-y-auto px-1.5 py-1">
           <div className="flex justify-between items-center px-1">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {loading
@@ -640,23 +844,15 @@ export default function AdminRequestsPage() {
                 <h3 className="font-semibold text-base">No requests found</h3>
                 <p className="text-xs text-muted-foreground mt-1">
                   Try adjusting status, blood group, or switching to &quot;All
-                  Locations&quot;.
+                  Locations&quot; to expand results.
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShowAllWorldwide}
-                className="text-xs mt-2"
-              >
-                Show All Locations
-              </Button>
             </div>
           ) : (
             requestsWithDistance.map((req) => {
-              const isSelected = selectedRequest?.id === req.id;
               const isCritical = req.urgency === "CRITICAL";
               const isUrgent = req.urgency === "URGENT";
+              const isSelected = selectedRequest?.id === req.id;
 
               return (
                 <Card
@@ -665,97 +861,110 @@ export default function AdminRequestsPage() {
                     setSelectedRequest(req);
                     setIsDetailDialogOpen(true);
                   }}
-                  className={`transition-all duration-200 border cursor-pointer shadow-sm rounded-xl ${
+                  className={`cursor-pointer transition-all duration-200 hover:shadow-md hover:border-red-400/80 ${
                     isSelected
-                      ? "ring-2 ring-red-500 border-red-500 bg-red-50/20 dark:bg-red-950/30"
-                      : "hover:border-red-300 dark:hover:border-red-900/60 hover:bg-muted/30"
+                      ? "ring-2 ring-red-500 border-transparent bg-red-500/5"
+                      : "bg-card"
+                  } ${
+                    isCritical
+                      ? "border-l-4 border-l-red-600"
+                      : isUrgent
+                        ? "border-l-4 border-l-amber-500"
+                        : "border-l-4 border-l-blue-500"
                   }`}
                 >
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-base font-extrabold text-red-600 dark:text-red-400">
-                            Need {getLabel(bloodGroupLabels, req.blood_group)}
-                          </CardTitle>
-                          <Badge
-                            variant={
-                              req.status === "OPEN"
-                                ? "default"
-                                : req.status === "FULFILLED"
-                                  ? "secondary"
-                                  : req.status === "CANCELLED"
-                                    ? "destructive"
-                                    : "outline"
-                            }
-                            className="text-[10px] font-semibold px-2 py-0"
-                          >
-                            {getLabel(requestStatusLabels, req.status)}
-                          </Badge>
-                          {req.urgency && (
-                            <Badge
-                              variant={
-                                isCritical
-                                  ? "destructive"
-                                  : isUrgent
-                                    ? "default"
-                                    : "secondary"
-                              }
-                              className="text-[10px] px-1.5 py-0"
-                            >
-                              {getLabel(urgencyLabels, req.urgency)}
-                            </Badge>
+                  <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between gap-2 space-y-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-lg font-black text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/80 px-2 py-0.5 rounded-lg shrink-0">
+                        {getLabel(bloodGroupLabels, req.blood_group)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-sm font-semibold truncate flex items-center gap-1.5">
+                          {req.hospital_name || req.area_name}
+                        </CardTitle>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 truncate">
+                          <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="truncate">{req.area_name}</span>
+                          {req.distanceText && (
+                            <span className="font-medium text-red-600 dark:text-red-400 ml-1 shrink-0">
+                              • {req.distanceText}
+                            </span>
                           )}
                         </div>
-
-                        {req.distanceText && useRadiusFilter && (
-                          <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>{req.distanceText}</span>
-                          </div>
-                        )}
                       </div>
+                    </div>
 
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                        {new Date(req.created_at).toLocaleDateString()}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Badge
+                        variant={
+                          req.status === "OPEN"
+                            ? "default"
+                            : req.status === "FULFILLED"
+                              ? "secondary"
+                              : req.status === "CANCELLED"
+                                ? "destructive"
+                                : "outline"
+                        }
+                        className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5"
+                      >
+                        {getLabel(requestStatusLabels, req.status)}
+                      </Badge>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {getLabel(urgencyLabels, req.urgency)}
                       </span>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-4 pt-1 text-xs text-muted-foreground space-y-2.5">
-                    <div className="flex items-center gap-1.5 text-foreground/90 font-medium">
-                      <Hospital className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">
-                        {req.hospital_name
-                          ? `${req.hospital_name} (${req.area_name})`
-                          : req.area_name}
+
+                  <CardContent className="p-4 pt-1 text-xs space-y-2">
+                    <div className="flex items-center justify-between text-muted-foreground pt-1 border-t">
+                      <span>Units Needed:</span>
+                      <span className="font-semibold text-foreground">
+                        {req.units_fulfilled} / {req.units_needed} bags (
+                        {getLabel(componentTypeLabels, req.component_type)})
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span>
-                        Requester:{" "}
-                        <strong className="text-foreground font-semibold">
-                          {req.requester?.name || "Unknown"}
-                        </strong>
-                      </span>
-                      <span>
-                        {req.units_fulfilled} / {req.units_needed} bags
-                      </span>
-                    </div>
+                    {req.patient_name && (
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Patient:</span>
+                        <span className="font-medium text-foreground">
+                          {req.patient_name}{" "}
+                          {req.patient_age ? `(${req.patient_age}y)` : ""}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="pt-1 flex items-center gap-2">
+                    {req.needed_time && (
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-amber-500" /> Needed
+                          By:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {new Date(req.needed_time).toLocaleDateString()}{" "}
+                          {new Date(req.needed_time).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 gap-2 border-t border-muted/50">
+                      <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                        <span className="text-[11px] text-muted-foreground truncate">
+                          By: {req.requester?.name || "Anonymous"}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground/80 bg-muted px-1 rounded truncate shrink-0">
+                          ID: {req.id.substring(0, 8)}...
+                        </span>
+                      </div>
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="w-full text-xs h-7.5 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedRequest(req);
-                          setIsDetailDialogOpen(true);
-                        }}
+                        variant="ghost"
+                        className="h-7 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50 font-medium shrink-0"
                       >
-                        <Eye className="w-3.5 h-3.5 mr-1" />
-                        View & Manage Request
+                        Manage &rarr;
                       </Button>
                     </div>
                   </CardContent>
@@ -770,7 +979,9 @@ export default function AdminRequestsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() =>
+                  updateParams({ page: Math.max(1, page - 1).toString() })
+                }
                 disabled={page === 1 || loading}
                 className="h-8 text-xs"
               >
@@ -782,7 +993,11 @@ export default function AdminRequestsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  updateParams({
+                    page: Math.min(totalPages, page + 1).toString(),
+                  })
+                }
                 disabled={page === totalPages || loading}
                 className="h-8 text-xs"
               >
@@ -793,7 +1008,7 @@ export default function AdminRequestsPage() {
         </div>
 
         {/* Right Side: Interactive Leaflet Map */}
-        <div className="w-full lg:w-7/12 h-[400px] lg:h-full rounded-2xl overflow-hidden border shadow-sm relative bg-muted/20">
+        <div className="w-full lg:w-7/12 h-100 lg:h-full rounded-2xl overflow-hidden border shadow-sm relative bg-muted/20">
           <Map
             center={center}
             zoom={12}
@@ -836,7 +1051,8 @@ export default function AdminRequestsPage() {
                 <div className="flex items-center justify-between gap-3 pr-6">
                   <DialogTitle className="text-xl font-bold flex items-center gap-2">
                     <span>
-                      Need {getLabel(bloodGroupLabels, selectedRequest.blood_group)}
+                      Need{" "}
+                      {getLabel(bloodGroupLabels, selectedRequest.blood_group)}
                     </span>
                     <Badge
                       variant={
@@ -854,10 +1070,32 @@ export default function AdminRequestsPage() {
                     </Badge>
                   </DialogTitle>
                 </div>
-                <DialogDescription>
-                  Request ID: {selectedRequest.id} • Created on{" "}
-                  {new Date(selectedRequest.created_at).toLocaleString()}
-                </DialogDescription>
+                <div className="flex flex-col gap-2 mt-1">
+                  <div className="flex items-center justify-between gap-2 p-2 bg-muted/60 rounded-lg border font-mono text-xs">
+                    <span className="truncate">
+                      Request ID:{" "}
+                      <strong className="text-foreground select-all">
+                        {selectedRequest.id}
+                      </strong>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[11px] font-semibold text-muted-foreground hover:text-foreground shrink-0 flex items-center gap-1"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedRequest.id);
+                        toast.success("Copied Request ID to clipboard!");
+                      }}
+                    >
+                      <Copy className="w-3 h-3" />
+                      Copy ID
+                    </Button>
+                  </div>
+                  <DialogDescription>
+                    Created on{" "}
+                    {new Date(selectedRequest.created_at).toLocaleString()}
+                  </DialogDescription>
+                </div>
               </DialogHeader>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3 text-sm">
@@ -986,7 +1224,9 @@ export default function AdminRequestsPage() {
                   <span className="font-semibold text-muted-foreground block mb-1">
                     Requester Note:
                   </span>
-                  <p className="text-foreground">{selectedRequest.patient_note}</p>
+                  <p className="text-foreground">
+                    {selectedRequest.patient_note}
+                  </p>
                 </div>
               )}
 
@@ -998,7 +1238,11 @@ export default function AdminRequestsPage() {
                     target="_blank"
                     className="w-full sm:w-auto"
                   >
-                    <Button variant="outline" size="sm" className="w-full text-xs">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                    >
                       <Eye className="w-3.5 h-3.5 mr-1.5" />
                       View Public Page
                     </Button>
@@ -1006,6 +1250,28 @@ export default function AdminRequestsPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditDialogOpen(true)}
+                    disabled={actionLoading}
+                    className="text-xs border-zinc-300 text-foreground hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 mr-1 text-blue-600" />
+                    Edit Details
+                  </Button>
+
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    disabled={actionLoading}
+                    className="text-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Delete
+                  </Button>
+
                   {selectedRequest.status !== "OPEN" && (
                     <Button
                       variant="outline"
@@ -1054,6 +1320,83 @@ export default function AdminRequestsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Admin Request Edit Dialog */}
+      <RequestEditDialog
+        request={selectedRequest}
+        isOpen={isEditDialogOpen}
+        isAdmin={true}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSuccess={(updated) => {
+          setSelectedRequest((prev) =>
+            prev ? { ...prev, ...(updated || {}) } : null,
+          );
+          queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
+        }}
+      />
+
+      {/* Admin Request Confirm Delete Dialog */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => !open && setIsDeleteDialogOpen(false)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-600 mb-2">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <DialogTitle className="text-lg font-bold">
+              Delete Blood Request?
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              As an administrator, are you sure you want to delete this blood
+              request? This will remove the request from public listings and
+              search results.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-2 flex flex-row justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={actionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteRequest}
+              disabled={actionLoading}
+              className="font-semibold"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-1.5" />
+              )}
+              Confirm Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+export default function AdminRequestsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <AdminRequestsContent />
+    </Suspense>
   );
 }

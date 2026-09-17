@@ -23,19 +23,22 @@ describe("RequestsService", () => {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       setParameters: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
-      getMany: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            id: "request-1",
-            location: { type: "Point", coordinates: [1.2, 3.4] },
-          },
-        ]),
+      getMany: jest.fn().mockResolvedValue([
+        {
+          id: "request-1",
+          location: { type: "Point", coordinates: [1.2, 3.4] },
+        },
+      ]),
     };
 
     requestRepositoryMock = {
       createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
+      find: jest.fn(),
+      findOne: jest.fn(),
+      save: jest.fn().mockImplementation((r) => Promise.resolve(r)),
+      softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -117,6 +120,113 @@ describe("RequestsService", () => {
         },
       ]);
       expect(cacheManagerMock.set).toHaveBeenCalled();
+    });
+  });
+
+  describe("findMyRequests", () => {
+    it("should return user's blood requests", async () => {
+      const mockRequests = [{ id: "req-1", requester_id: "user-1" }];
+      requestRepositoryMock.find.mockResolvedValue(mockRequests);
+
+      const result = await service.findMyRequests("user-1");
+      expect(result).toEqual(mockRequests);
+      expect(requestRepositoryMock.find).toHaveBeenCalledWith({
+        where: { requester_id: "user-1" },
+        order: { created_at: "DESC" },
+      });
+    });
+  });
+
+  describe("update", () => {
+    it("should allow requester to update their own request details and status", async () => {
+      const existing = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.OPEN,
+        patient_name: "John",
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(existing);
+
+      const result = await service.update("user-1", "USER", "req-1", {
+        status: RequestStatus.FULFILLED,
+        patient_name: "John Doe",
+      });
+
+      expect(result.status).toBe(RequestStatus.FULFILLED);
+      expect(result.patient_name).toBe("John Doe");
+      expect(requestRepositoryMock.save).toHaveBeenCalled();
+    });
+
+    it("should allow admin to update any request", async () => {
+      const existing = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.OPEN,
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(existing);
+
+      const result = await service.update("admin-99", "ADMIN", "req-1", {
+        status: RequestStatus.CANCELLED,
+      });
+
+      expect(result.status).toBe(RequestStatus.CANCELLED);
+      expect(requestRepositoryMock.save).toHaveBeenCalled();
+    });
+
+    it("should throw ForbiddenException if another user attempts to update", async () => {
+      const existing = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.OPEN,
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(existing);
+
+      await expect(
+        service.update("user-2", "USER", "req-1", {
+          status: RequestStatus.CANCELLED,
+        }),
+      ).rejects.toThrow("You are not authorized to update this blood request");
+    });
+  });
+
+  describe("delete", () => {
+    it("should allow requester to delete their own request", async () => {
+      const existing = {
+        id: "req-1",
+        requester_id: "user-1",
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(existing);
+
+      const result = await service.delete("user-1", "USER", "req-1");
+      expect(result).toEqual({
+        success: true,
+        message: "Request deleted successfully",
+      });
+      expect(requestRepositoryMock.softDelete).toHaveBeenCalledWith("req-1");
+    });
+
+    it("should allow admin to delete any request", async () => {
+      const existing = {
+        id: "req-1",
+        requester_id: "user-1",
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(existing);
+
+      const result = await service.delete("admin-1", "ADMIN", "req-1");
+      expect(result.success).toBe(true);
+      expect(requestRepositoryMock.softDelete).toHaveBeenCalledWith("req-1");
+    });
+
+    it("should throw ForbiddenException if another user attempts to delete", async () => {
+      const existing = {
+        id: "req-1",
+        requester_id: "user-1",
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(existing);
+
+      await expect(service.delete("user-2", "USER", "req-1")).rejects.toThrow(
+        "You are not authorized to delete this blood request",
+      );
     });
   });
 });

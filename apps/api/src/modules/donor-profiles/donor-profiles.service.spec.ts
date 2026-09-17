@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DonorProfilesService } from "./donor-profiles.service";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { DonorProfile } from "../../entities/donor-profile.entity";
+import { User } from "../../entities/user.entity";
 
 describe("DonorProfilesService", () => {
   let service: DonorProfilesService;
@@ -12,6 +13,10 @@ describe("DonorProfilesService", () => {
         DonorProfilesService,
         {
           provide: getRepositoryToken(DonorProfile),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(User),
           useValue: {},
         },
       ],

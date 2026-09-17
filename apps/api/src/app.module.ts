@@ -10,7 +10,8 @@ import { PushSubscriptionsModule } from "./modules/push-subscriptions/push-subsc
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { UserThrottlerGuard } from "./common/guards/user-throttler.guard";
 import { ScheduleModule } from "@nestjs/schedule";
 import { APP_GUARD } from "@nestjs/core";
 import { validateEnv } from "./config/env.validation";
@@ -59,11 +60,11 @@ import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: JwtAuthGuard,
     },
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      useClass: UserThrottlerGuard,
     },
   ],
 })

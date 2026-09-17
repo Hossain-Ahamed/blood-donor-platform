@@ -1,61 +1,61 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // 1. Enums
 export enum UserRole {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
+  USER = "USER",
+  ADMIN = "ADMIN",
 }
 
 export enum BloodGroup {
-  A_POS = 'A_POS',
-  A_NEG = 'A_NEG',
-  B_POS = 'B_POS',
-  B_NEG = 'B_NEG',
-  AB_POS = 'AB_POS',
-  AB_NEG = 'AB_NEG',
-  O_POS = 'O_POS',
-  O_NEG = 'O_NEG',
+  A_POS = "A_POS",
+  A_NEG = "A_NEG",
+  B_POS = "B_POS",
+  B_NEG = "B_NEG",
+  AB_POS = "AB_POS",
+  AB_NEG = "AB_NEG",
+  O_POS = "O_POS",
+  O_NEG = "O_NEG",
 }
 
 export enum ComponentType {
-  WHOLE_BLOOD = 'WHOLE_BLOOD',
-  PLATELETS = 'PLATELETS',
-  PLASMA = 'PLASMA',
-  RBC = 'RBC',
-  CRYO = 'CRYO',
+  WHOLE_BLOOD = "WHOLE_BLOOD",
+  PLATELETS = "PLATELETS",
+  PLASMA = "PLASMA",
+  RBC = "RBC",
+  CRYO = "CRYO",
 }
 
 export enum UrgencyLevel {
-  CRITICAL = 'CRITICAL',
-  URGENT = 'URGENT',
-  NORMAL = 'NORMAL',
+  CRITICAL = "CRITICAL",
+  URGENT = "URGENT",
+  NORMAL = "NORMAL",
 }
 
 export enum RequestStatus {
-  OPEN = 'OPEN',
-  PARTIALLY_FULFILLED = 'PARTIALLY_FULFILLED',
-  FULFILLED = 'FULFILLED',
-  EXPIRED = 'EXPIRED',
-  CANCELLED = 'CANCELLED',
+  OPEN = "OPEN",
+  PARTIALLY_FULFILLED = "PARTIALLY_FULFILLED",
+  FULFILLED = "FULFILLED",
+  EXPIRED = "EXPIRED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum ResponseStatus {
-  OFFERED = 'OFFERED',
-  ACCEPTED = 'ACCEPTED',
-  DECLINED = 'DECLINED',
-  CANCELLED = 'CANCELLED',
+  OFFERED = "OFFERED",
+  ACCEPTED = "ACCEPTED",
+  DECLINED = "DECLINED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum ReportTargetType {
-  USER = 'USER',
-  REQUEST = 'REQUEST',
+  USER = "USER",
+  REQUEST = "REQUEST",
 }
 
 export enum ReportStatus {
-  PENDING = 'PENDING',
-  REVIEWED = 'REVIEWED',
-  DISMISSED = 'DISMISSED',
-  ACTIONED = 'ACTIONED',
+  PENDING = "PENDING",
+  REVIEWED = "REVIEWED",
+  DISMISSED = "DISMISSED",
+  ACTIONED = "ACTIONED",
 }
 
 // 2. Zod Schemas
@@ -100,7 +100,9 @@ export const BloodRequestSchema = z.object({
   id: z.string().uuid(),
   requester_id: z.string().uuid(),
   blood_group: z.nativeEnum(BloodGroup),
-  component_type: z.nativeEnum(ComponentType).default(ComponentType.WHOLE_BLOOD),
+  component_type: z
+    .nativeEnum(ComponentType)
+    .default(ComponentType.WHOLE_BLOOD),
   units_needed: z.number().int().positive().default(1),
   units_fulfilled: z.number().int().nonnegative().default(0),
   urgency: z.nativeEnum(UrgencyLevel).default(UrgencyLevel.NORMAL),
@@ -130,6 +132,7 @@ export const ResponseSchema = z.object({
   donor_id: z.string().uuid(),
   status: z.nativeEnum(ResponseStatus).default(ResponseStatus.OFFERED),
   message: z.string().nullable().optional(),
+  rejection_reason: z.string().nullable().optional(),
   created_at: z.date(),
   updated_at: z.date(),
 });
@@ -158,4 +161,3 @@ export const ReportSchema = z.object({
   reviewed_at: z.date().nullable().optional(),
 });
 export type Report = z.infer<typeof ReportSchema>;
-

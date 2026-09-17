@@ -47,32 +47,45 @@ const CenterIcon = L.divIcon({
   popupAnchor: [0, -12],
 });
 
-// A custom blood drop pin icon for requests
-const createRequestIcon = (bloodGroup?: string, isCritical?: boolean) => {
+// A custom blood drop pin icon for requests (distinct emerald icon if current user applied)
+const createRequestIcon = (
+  bloodGroup?: string,
+  isCritical?: boolean,
+  hasApplied?: boolean,
+) => {
   const bgText = bloodGroup ? getLabel(bloodGroupLabels, bloodGroup) : "🩸";
-  const bgColor = isCritical ? "#dc2626" : "#e11d48";
+  const bgColor = hasApplied
+    ? "#059669"
+    : isCritical
+      ? "#dc2626"
+      : "#e11d48";
+  const borderColor = hasApplied ? "#a7f3d0" : "white";
+  const appliedBadge = hasApplied
+    ? `<span style="font-size: 8px; font-weight: 800; display: block; line-height: 1; margin-top: 1px; color: #ecfdf5;">APPLIED</span>`
+    : "";
+
   return L.divIcon({
     html: `<div style="
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-width: 32px;
-      height: 32px;
+      min-width: 36px;
+      height: 36px;
       padding: 0 4px;
       background: ${bgColor};
       color: white;
       font-weight: 700;
       font-size: 11px;
-      border: 2px solid white;
-      border-radius: 16px;
+      border: 2px solid ${borderColor};
+      border-radius: 18px;
       box-shadow: 0 3px 8px rgba(0,0,0,0.35);
       cursor: pointer;
-    ">${bgText}</div>`,
+    ">${bgText}${appliedBadge}</div>`,
     className: "",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
   });
 };
 
@@ -86,6 +99,7 @@ export interface MapMarkerItem {
   area_name?: string;
   hospital_name?: string;
   distanceText?: string;
+  hasApplied?: boolean;
 }
 
 interface MapProps {
@@ -145,7 +159,6 @@ export default function Map({
       style={{
         height: "100%",
         width: "100%",
-        minHeight: "400px",
         borderRadius: "0.5rem",
         zIndex: 0,
       }}
@@ -187,7 +200,7 @@ export default function Map({
       {markers.map((m) => {
         const isCritical = m.urgency === "CRITICAL";
         const icon = m.blood_group
-          ? createRequestIcon(m.blood_group, isCritical)
+          ? createRequestIcon(m.blood_group, isCritical, m.hasApplied)
           : DefaultIcon;
 
         return (
@@ -201,6 +214,11 @@ export default function Map({
           >
             <Popup>
               <div className="p-1 min-w-[180px]">
+                {m.hasApplied && (
+                  <div className="mb-1.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 text-center flex items-center justify-center gap-1">
+                    ✓ You Offered to Donate
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span className="font-bold text-sm text-red-600 dark:text-red-400">
                     Need{" "}

@@ -56,6 +56,7 @@ interface BrowseClientProps {
   initialBloodGroup?: string;
   initialRadiusKm?: string;
   hasExplicitCoords?: boolean;
+  appliedRequestIds?: string[];
 }
 
 function calculateDistance(
@@ -94,8 +95,12 @@ export function BrowseClient({
   initialBloodGroup = "ALL",
   initialRadiusKm = "10",
   hasExplicitCoords = false,
+  appliedRequestIds = [],
 }: BrowseClientProps) {
   const pathname = usePathname();
+
+  // Set of requests user has applied to
+  const appliedSet = new Set(appliedRequestIds);
 
   // Location state
   const [center, setCenter] = useState<[number, number]>(initialCenter);
@@ -115,6 +120,16 @@ export function BrowseClient({
   );
 
   const isFirstMount = useRef(true);
+
+  // Scroll to selected request card when selected on map
+  useEffect(() => {
+    if (selectedRequestId) {
+      const el = document.getElementById(`request-card-${selectedRequestId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [selectedRequestId]);
 
   // Sync state to URL params so everything persists on page reload
   const syncToUrl = useCallback(
@@ -297,6 +312,7 @@ export function BrowseClient({
     area_name: r.area_name,
     hospital_name: r.hospital_name,
     distanceText: r.distanceText,
+    hasApplied: appliedSet.has(r.id),
   }));
 
   const locationBadgeLabel = {
@@ -309,7 +325,7 @@ export function BrowseClient({
   }[locationSource];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] p-3 md:p-6 gap-4">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)] lg:h-[calc(100vh-4rem)] p-3 md:p-6 gap-4">
       {/* Top Header & Interactive Filter Bar */}
       <div className="bg-card p-4 md:p-5 rounded-2xl border shadow-sm flex flex-col gap-4">
         {/* Title and Location Switcher Row */}
@@ -488,8 +504,8 @@ export function BrowseClient({
 
       {/* Main Content: Left Requests List + Right Interactive Map */}
       <div className="flex flex-col lg:flex-row gap-5 flex-1 min-h-0">
-        {/* Left Column: Sorted Requests List */}
-        <div className="w-full lg:w-5/12 flex flex-col gap-3 overflow-y-auto pr-1">
+        {/* Column: Sorted Requests List (Bottom on mobile, Left on desktop) */}
+        <div className="order-2 lg:order-1 w-full lg:w-5/12 flex flex-col gap-3 lg:overflow-y-auto pr-0 lg:pr-1">
           <div className="flex justify-between items-center px-1">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -556,22 +572,34 @@ export function BrowseClient({
               const isSelected = selectedRequestId === req.id;
               const isCritical = req.urgency === "CRITICAL";
               const isUrgent = req.urgency === "URGENT";
+              const hasApplied = appliedSet.has(req.id);
 
               return (
                 <Card
                   key={req.id}
+                  id={`request-card-${req.id}`}
                   onClick={() => setSelectedRequestId(req.id)}
                   className={`transition-all duration-200 border cursor-pointer shadow-sm rounded-xl ${
-                    isSelected
-                      ? "ring-2 ring-red-500 border-red-500 bg-red-50/20 dark:bg-red-950/30"
-                      : "hover:border-red-300 dark:hover:border-red-900/60 hover:bg-muted/30"
+                    hasApplied
+                      ? isSelected
+                        ? "ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/40"
+                        : "border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/15 dark:bg-emerald-950/20 hover:border-emerald-400"
+                      : isSelected
+                        ? "ring-2 ring-red-500 border-red-500 bg-red-50/20 dark:bg-red-950/30"
+                        : "hover:border-red-300 dark:hover:border-red-900/60 hover:bg-muted/30"
                   }`}
                 >
                   <CardHeader className="p-4 pb-2">
                     <div className="flex justify-between items-start gap-2">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg font-extrabold text-red-600 dark:text-red-400">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CardTitle
+                            className={`text-lg font-extrabold ${
+                              hasApplied
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-red-600 dark:text-red-400"
+                            }`}
+                          >
                             Need {getLabel(bloodGroupLabels, req.blood_group)}
                           </CardTitle>
                           <Badge
@@ -586,6 +614,11 @@ export function BrowseClient({
                           >
                             {getLabel(urgencyLabels, req.urgency)}
                           </Badge>
+                          {hasApplied && (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2 py-0">
+                              ✓ You Applied
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                           <MapPin className="w-3.5 h-3.5" />
@@ -617,9 +650,15 @@ export function BrowseClient({
                       <Link href={`/requests/${req.id}`} className="block">
                         <Button
                           size="sm"
-                          className="w-full bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium shadow-sm"
+                          className={`w-full text-white text-xs h-8 font-medium shadow-sm ${
+                            hasApplied
+                              ? "bg-emerald-600 hover:bg-emerald-700"
+                              : "bg-red-600 hover:bg-red-700"
+                          }`}
                         >
-                          Respond & Donate
+                          {hasApplied
+                            ? "View Your Offer & Details"
+                            : "Respond & Donate"}
                         </Button>
                       </Link>
                     </div>
@@ -630,8 +669,8 @@ export function BrowseClient({
           )}
         </div>
 
-        {/* Right Column: Interactive Map */}
-        <div className="w-full lg:w-7/12 h-[420px] lg:h-full rounded-2xl overflow-hidden border shadow-sm relative bg-muted/20">
+        {/* Interactive Map (Top on mobile, Right on desktop) */}
+        <div className="order-1 lg:order-2 w-full lg:w-7/12 h-[320px] sm:h-[380px] md:h-[420px] lg:h-full rounded-2xl overflow-hidden border shadow-sm relative bg-muted/20 shrink-0">
           <MapWrapper
             center={center}
             markers={markers}

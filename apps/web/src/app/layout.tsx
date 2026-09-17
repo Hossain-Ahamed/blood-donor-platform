@@ -21,6 +21,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getLocale } from "next-intl/server";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { AuthProvider } from "@/hooks/useAuth";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 export default async function RootLayout({
@@ -38,11 +39,13 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <NextIntlClientProvider messages={messages}>
-          <AuthProvider>
-            <ServiceWorkerRegister />
-            {children}
-            <Toaster />
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <ServiceWorkerRegister />
+              {children}
+              <Toaster />
+            </AuthProvider>
+          </QueryProvider>
         </NextIntlClientProvider>
       </body>
     </html>

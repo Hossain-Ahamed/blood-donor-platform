@@ -1,10 +1,20 @@
-import { Injectable, NotFoundException, Inject, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+  Logger,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
 import { BloodRequest } from "../../entities/request.entity";
-import { CreateRequestDto, NearbyQueryDto } from "./dto/request.dto";
+import {
+  CreateRequestDto,
+  UpdateRequestDto,
+  NearbyQueryDto,
+} from "./dto/request.dto";
 import { RequestStatus } from "@repo/shared";
 import { Point } from "geojson";
 
@@ -57,27 +67,62 @@ export class RequestsService {
     this.donorProfilesService
       .findNearby(dto.lat, dto.lng, 10, dto.blood_group)
       .then((donors) => {
+        this.logger.log(
+          `Found ${donors.length} nearby matching donors for ${dto.blood_group} request within 10km`,
+        );
         const donorUserIds = donors
           .map((d) => d.user_id)
           .filter((id) => id !== userId); // don't notify the requester themselves
-        if (donorUserIds.length > 0) {
-          const payload = {
-            title: `Urgent: ${dto.blood_group} Blood Needed!`,
-            body: `A new request for ${dto.blood_group} blood has been made in ${dto.area_name}.`,
-            url: `/requests/${savedRequest.id}`,
-          };
-          this.pushSubscriptionsService.notifyUsers(donorUserIds, payload);
+
+        if (donorUserIds.length === 0) {
+          this.logger.log(
+            `No other eligible donors to notify (total found: ${donors.length}, requester excluded: ${userId})`,
+          );
+          return;
         }
+
+        const payload = {
+          title: `Urgent: ${dto.blood_group} Blood Needed!`,
+          body: `A new request for ${dto.blood_group} blood has been made in ${dto.area_name}.`,
+          url: `/requests/${savedRequest.id}`,
+        };
+        this.logger.log(
+          `Dispatching push notifications to ${donorUserIds.length} donor(s)`,
+        );
+        this.pushSubscriptionsService.notifyUsers(donorUserIds, payload);
       })
-      .catch((err) => console.error("Failed to notify donors:", err));
+      .catch((err) => this.logger.error("Failed to notify donors:", err));
 
     return savedRequest;
   }
 
   async findOne(id: string): Promise<BloodRequest> {
-    const request = await this.requestRepository.findOne({ where: { id } });
+    const request = await this.requestRepository.findOne({
+      where: { id },
+      relations: ["requester"],
+    });
     if (!request) {
       throw new NotFoundException("Request not found");
+    }
+    if (this.donorProfilesService?.findByUserId) {
+      try {
+        const requesterProfile = await this.donorProfilesService.findByUserId(
+          request.requester_id,
+        );
+        if (requesterProfile) {
+          (request as any).requester_profile = {
+            area_name: requesterProfile.area_name,
+            blood_group: requesterProfile.blood_group,
+            is_available: requesterProfile.is_available,
+            last_donation_date: requesterProfile.last_donation_date,
+          };
+        }
+      } catch (e) {
+        this.logger.warn(
+          `Failed to fetch requester profile for ${request.requester_id}:`,
+          e,
+        );
+      }
     }
     return request;
   }
@@ -186,8 +231,11 @@ export class RequestsService {
 
       return sanitizedResults;
     } catch (err: any) {
-      this.logger.error(`Spatial query failed, falling back: ${err.message}`, err.stack);
-      
+      this.logger.error(
+        `Spatial query failed, falling back: ${err.message}`,
+        err.stack,
+      );
+
       const fallbackResults = await this.requestRepository.find({
         where: {
           status: RequestStatus.OPEN,
@@ -202,5 +250,131 @@ export class RequestsService {
         return r;
       });
     }
+  }
+
+  async findMyRequests(userId: string): Promise<BloodRequest[]> {
+    return this.requestRepository.find({
+      where: { requester_id: userId },
+      order: { created_at: "DESC" },
+    });
+  }
+
+  async update(
+    userId: string,
+    userRole: string,
+    id: string,
+    dto: UpdateRequestDto,
+  ): Promise<BloodRequest> {
+    const request = await this.requestRepository.findOne({ where: { id } });
+    if (!request) {
+      throw new NotFoundException("Request not found");
+    }
+
+    if (request.requester_id !== userId && userRole !== "ADMIN") {
+      throw new ForbiddenException(
+        "You are not authorized to update this blood request",
+      );
+    }
+
+    if (dto.blood_group !== undefined) {
+      request.blood_group = dto.blood_group;
+    }
+    if (dto.component_type !== undefined) {
+      request.component_type = dto.component_type;
+    }
+    if (dto.units_needed !== undefined) {
+      request.units_needed = dto.units_needed;
+    }
+    if (dto.units_fulfilled !== undefined) {
+      request.units_fulfilled = dto.units_fulfilled;
+    }
+    if (dto.urgency !== undefined) {
+      request.urgency = dto.urgency;
+    }
+    if (dto.lat !== undefined && dto.lng !== undefined) {
+      request.location = {
+        type: "Point",
+        coordinates: [dto.lng, dto.lat],
+      };
+    }
+    if (dto.area_name !== undefined) {
+      request.area_name = dto.area_name;
+    }
+    if (dto.hospital_name !== undefined) {
+      request.hospital_name = dto.hospital_name;
+    }
+    if (dto.patient_name !== undefined) {
+      request.patient_name = dto.patient_name;
+    }
+    if (dto.patient_age !== undefined) {
+      request.patient_age = dto.patient_age;
+    }
+    if (dto.disease !== undefined) {
+      request.disease = dto.disease;
+    }
+    if (dto.needed_time !== undefined) {
+      request.needed_time = dto.needed_time
+        ? new Date(dto.needed_time)
+        : (null as any);
+    }
+    if (dto.patient_note !== undefined) {
+      request.patient_note = dto.patient_note;
+    }
+    if (dto.contact_phone !== undefined) {
+      request.contact_phone = dto.contact_phone;
+    }
+    if (dto.status !== undefined) {
+      request.status = dto.status;
+    }
+
+    const saved = await this.requestRepository.save(request);
+
+    try {
+      if (
+        this.cacheManager &&
+        typeof (this.cacheManager as any).reset === "function"
+      ) {
+        await (this.cacheManager as any).reset();
+      }
+    } catch {
+      // cache reset failover
+    }
+
+    return saved;
+  }
+
+  async delete(
+    userId: string,
+    userRole: string,
+    id: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const request = await this.requestRepository.findOne({ where: { id } });
+    if (!request) {
+      throw new NotFoundException("Request not found");
+    }
+
+    if (request.requester_id !== userId && userRole !== "ADMIN") {
+      throw new ForbiddenException(
+        "You are not authorized to delete this blood request",
+      );
+    }
+
+    await this.requestRepository.softDelete(id);
+
+    try {
+      if (
+        this.cacheManager &&
+        typeof (this.cacheManager as any).reset === "function"
+      ) {
+        await (this.cacheManager as any).reset();
+      }
+    } catch {
+      // cache reset failover
+    }
+
+    return {
+      success: true,
+      message: "Request deleted successfully",
+    };
   }
 }

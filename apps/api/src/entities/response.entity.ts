@@ -1,42 +1,53 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
-import { ResponseStatus } from '@repo/shared';
-import { BloodRequest } from './request.entity';
-import { User } from './user.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Unique,
+} from "typeorm";
+import { ResponseStatus } from "@repo/shared";
+import { BloodRequest } from "./request.entity";
+import { User } from "./user.entity";
 
-@Entity('responses')
-@Unique(['request_id', 'donor_id'])
+@Entity("responses")
+@Unique(["request_id", "donor_id"])
 export class Response {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column('uuid')
+  @Column("uuid")
   request_id: string;
 
   @ManyToOne(() => BloodRequest)
-  @JoinColumn({ name: 'request_id' })
+  @JoinColumn({ name: "request_id" })
   request: BloodRequest;
 
-  @Column('uuid')
+  @Column("uuid")
   donor_id: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'donor_id' })
+  @JoinColumn({ name: "donor_id" })
   donor: User;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: ResponseStatus,
     default: ResponseStatus.OFFERED,
   })
   status: ResponseStatus;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   message: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @Column({ type: "text", nullable: true })
+  rejection_reason: string;
+
+  @CreateDateColumn({ type: "timestamptz" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: "timestamptz" })
   updated_at: Date;
 }
-

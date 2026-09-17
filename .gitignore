@@ -7,4 +7,5 @@ coverage
 DATABSE.md
 PROJECT_PLAN.md
 .pnpm-store
-
+.pnpm-debug.log
+.pnpm-lock.yaml

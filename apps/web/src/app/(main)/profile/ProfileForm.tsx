@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,19 @@ type ProfileFormProps = {
   initialUser?: UserType | null;
 };
 
+interface ProfileFormValues {
+  name: string;
+  blood_group: BloodGroup;
+  date_of_birth: string;
+  religion: string;
+  health_notes: string;
+  last_donation_date: string;
+  bio: string;
+  lat: number | null;
+  lng: number | null;
+  area_name: string;
+}
+
 function calculateAge(dobString: string): number | null {
   if (!dobString) return null;
   const birthDate = new Date(dobString);
@@ -61,38 +74,13 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
     subscribeToPush,
   } = usePushNotifications();
 
-  // User details
-  const [name, setName] = useState<string>(
-    initialData?.user?.name || initialUser?.name || "",
-  );
-
-  // Medical / Donor details
-  const [bloodGroup, setBloodGroup] = useState<string>(
-    initialData?.blood_group || "O_POS",
-  );
-
-  // Date of Birth & Computed Age
-  const rawDob = (initialData as any)?.date_of_birth;
+  // Date of Birth initial value
+  const rawDob = initialData?.date_of_birth;
   const initialDob = rawDob ? new Date(rawDob).toISOString().split("T")[0] : "";
-  const [dateOfBirth, setDateOfBirth] = useState<string>(initialDob);
 
-  const computedAge =
-    calculateAge(dateOfBirth) ??
-    (initialData?.age ? Number(initialData.age) : null);
-
-  const [religion, setReligion] = useState<string>(initialData?.religion || "");
-  const [healthNotes, setHealthNotes] = useState<string>(
-    initialData?.health_notes || "",
-  );
-  const [lastDonationDate, setLastDonationDate] = useState<string>(
-    initialData?.last_donation_date
-      ? new Date(initialData.last_donation_date).toISOString().split("T")[0]
-      : "",
-  );
-  const [bio, setBio] = useState<string>(initialData?.bio || "");
-
-  // Location details
-  const loc: any = initialData?.location;
+  // Location initial values
+  const loc = initialData?.location as
+    { lat?: number; lng?: number; coordinates?: [number, number] } | undefined;
   const initialLat =
     loc?.lat ??
     (Array.isArray(loc?.coordinates) && loc.coordinates.length === 2
@@ -104,40 +92,51 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       ? loc.coordinates[0]
       : null);
 
-  const [lat, setLat] = useState<number | null>(initialLat);
-  const [lng, setLng] = useState<number | null>(initialLng);
-  const [areaName, setAreaName] = useState<string>(
-    initialData?.area_name || "",
-  );
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    formState: { isSubmitting },
+  } = useForm<ProfileFormValues>({
+    defaultValues: {
+      name: initialData?.user?.name || initialUser?.name || "",
+      blood_group:
+        (initialData?.blood_group as BloodGroup) || ("O_POS" as BloodGroup),
+      date_of_birth: initialDob,
+      religion: initialData?.religion || "",
+      health_notes: initialData?.health_notes || "",
+      last_donation_date: initialData?.last_donation_date
+        ? new Date(initialData.last_donation_date).toISOString().split("T")[0]
+        : "",
+      bio: initialData?.bio || "",
+      lat: initialLat,
+      lng: initialLng,
+      area_name: initialData?.area_name || "",
+    },
+  });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const dateOfBirth = useWatch({ control, name: "date_of_birth" });
+  const lat = useWatch({ control, name: "lat" });
+  const lng = useWatch({ control, name: "lng" });
+  const areaName = useWatch({ control, name: "area_name" });
 
-  const handleLocationChange = (
-    newLat: number,
-    newLng: number,
-    suggestedArea?: string,
-  ) => {
-    setLat(newLat);
-    setLng(newLng);
-    if (suggestedArea) {
-      setAreaName(suggestedArea);
-    }
-  };
+  const computedAge =
+    calculateAge(dateOfBirth) ??
+    (initialData?.age ? Number(initialData.age) : null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
+  const onSubmit = async (data: ProfileFormValues) => {
+    if (!data.name.trim()) {
       toast.error("Please enter your name");
       return;
     }
 
-    if (lat === null || lng === null) {
+    if (data.lat === null || data.lng === null) {
       toast.error("Please select your location on the map or use GPS");
       return;
     }
 
-    if (!areaName.trim()) {
+    if (!data.area_name.trim()) {
       toast.error("Please enter your area or locality name");
       return;
     }
@@ -147,32 +146,19 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      const payload: {
-        name: string;
-        blood_group: BloodGroup;
-        lat: number;
-        lng: number;
-        area_name: string;
-        date_of_birth?: string;
-        age?: number;
-        religion?: string;
-        health_notes?: string;
-        bio?: string;
-        last_donation_date?: string;
-      } = {
-        name: name.trim(),
-        blood_group: bloodGroup as BloodGroup,
-        lat: Number(lat),
-        lng: Number(lng),
-        area_name: areaName.trim(),
-        date_of_birth: dateOfBirth || undefined,
+      const payload: Record<string, unknown> = {
+        name: data.name.trim(),
+        blood_group: data.blood_group,
+        lat: Number(data.lat),
+        lng: Number(data.lng),
+        area_name: data.area_name.trim(),
+        date_of_birth: data.date_of_birth || undefined,
         age: computedAge ?? undefined,
-        religion: religion.trim() || undefined,
-        health_notes: healthNotes.trim() || undefined,
-        bio: bio.trim() || undefined,
-        last_donation_date: lastDonationDate || undefined,
+        religion: data.religion.trim() || undefined,
+        health_notes: data.health_notes.trim() || undefined,
+        bio: data.bio.trim() || undefined,
+        last_donation_date: data.last_donation_date || undefined,
       };
 
       await apiClient.request("/donor-profiles", {
@@ -189,15 +175,13 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
       } else {
         toast.error("Failed to update profile. Please try again.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="md:col-span-2 space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Personal Information */}
           <Card className="shadow-sm border-zinc-200">
             <CardHeader>
@@ -216,9 +200,7 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                 </Label>
                 <Input
                   id="name"
-                  name="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  {...register("name")}
                   placeholder="Enter your full name"
                   required
                 />
@@ -247,11 +229,9 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                   </div>
                   <Input
                     id="dateOfBirth"
-                    name="dateOfBirth"
                     type="date"
                     max={new Date().toISOString().split("T")[0]}
-                    value={dateOfBirth}
-                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    {...register("date_of_birth")}
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Age is automatically calculated from your birth date.
@@ -260,33 +240,39 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
 
                 <div className="grid gap-2">
                   <Label htmlFor="religion">Religion</Label>
-                  <Select
-                    value={religion}
-                    onValueChange={(val: string | null) =>
-                      setReligion(val || "")
-                    }
-                  >
-                    <SelectTrigger id="religion">
-                      <SelectValue placeholder="Select Religion (Optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Islam" label="Islam">
-                        Islam
-                      </SelectItem>
-                      <SelectItem value="Hinduism" label="Hinduism">
-                        Hinduism
-                      </SelectItem>
-                      <SelectItem value="Christianity" label="Christianity">
-                        Christianity
-                      </SelectItem>
-                      <SelectItem value="Buddhism" label="Buddhism">
-                        Buddhism
-                      </SelectItem>
-                      <SelectItem value="Other" label="Other">
-                        Other
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    name="religion"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={(val: string | null) =>
+                          field.onChange(val || "")
+                        }
+                      >
+                        <SelectTrigger id="religion">
+                          <SelectValue placeholder="Select Religion (Optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Islam" label="Islam">
+                            Islam
+                          </SelectItem>
+                          <SelectItem value="Hinduism" label="Hinduism">
+                            Hinduism
+                          </SelectItem>
+                          <SelectItem value="Christianity" label="Christianity">
+                            Christianity
+                          </SelectItem>
+                          <SelectItem value="Buddhism" label="Buddhism">
+                            Buddhism
+                          </SelectItem>
+                          <SelectItem value="Other" label="Other">
+                            Other
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -309,52 +295,56 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                   <Label htmlFor="bloodGroup">
                     Blood Group <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    value={bloodGroup}
-                    onValueChange={(val: string | null) =>
-                      val && setBloodGroup(val)
-                    }
-                  >
-                    <SelectTrigger id="bloodGroup">
-                      <SelectValue placeholder="Select Blood Group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A_POS" label="A+">
-                        A+
-                      </SelectItem>
-                      <SelectItem value="A_NEG" label="A-">
-                        A-
-                      </SelectItem>
-                      <SelectItem value="B_POS" label="B+">
-                        B+
-                      </SelectItem>
-                      <SelectItem value="B_NEG" label="B-">
-                        B-
-                      </SelectItem>
-                      <SelectItem value="O_POS" label="O+">
-                        O+
-                      </SelectItem>
-                      <SelectItem value="O_NEG" label="O-">
-                        O-
-                      </SelectItem>
-                      <SelectItem value="AB_POS" label="AB+">
-                        AB+
-                      </SelectItem>
-                      <SelectItem value="AB_NEG" label="AB-">
-                        AB-
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    name="blood_group"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={(val: string | null) =>
+                          val && field.onChange(val as BloodGroup)
+                        }
+                      >
+                        <SelectTrigger id="bloodGroup">
+                          <SelectValue placeholder="Select Blood Group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A_POS" label="A+">
+                            A+
+                          </SelectItem>
+                          <SelectItem value="A_NEG" label="A-">
+                            A-
+                          </SelectItem>
+                          <SelectItem value="B_POS" label="B+">
+                            B+
+                          </SelectItem>
+                          <SelectItem value="B_NEG" label="B-">
+                            B-
+                          </SelectItem>
+                          <SelectItem value="O_POS" label="O+">
+                            O+
+                          </SelectItem>
+                          <SelectItem value="O_NEG" label="O-">
+                            O-
+                          </SelectItem>
+                          <SelectItem value="AB_POS" label="AB+">
+                            AB+
+                          </SelectItem>
+                          <SelectItem value="AB_NEG" label="AB-">
+                            AB-
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="lastDonation">Last Donation Date</Label>
                   <Input
                     id="lastDonation"
-                    name="lastDonation"
                     type="date"
-                    value={lastDonationDate}
-                    onChange={(e) => setLastDonationDate(e.target.value)}
+                    {...register("last_donation_date")}
                   />
                   <p className="text-xs text-muted-foreground">
                     Calculates your 90-day cooldown availability.
@@ -372,10 +362,8 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                 </Label>
                 <textarea
                   id="healthNotes"
-                  name="healthNotes"
                   rows={3}
-                  value={healthNotes}
-                  onChange={(e) => setHealthNotes(e.target.value)}
+                  {...register("health_notes")}
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="e.g. Any allergies, past medical conditions, weight, medications..."
                 />
@@ -399,8 +387,14 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                 lat={lat}
                 lng={lng}
                 areaName={areaName}
-                onLocationChange={handleLocationChange}
-                onAreaNameChange={(name) => setAreaName(name)}
+                onLocationChange={(newLat, newLng, suggestedArea) => {
+                  setValue("lat", newLat);
+                  setValue("lng", newLng);
+                  if (suggestedArea) {
+                    setValue("area_name", suggestedArea);
+                  }
+                }}
+                onAreaNameChange={(name) => setValue("area_name", name)}
                 areaInputLabel="Your Area / Neighborhood"
                 areaInputPlaceholder="e.g. Uttara Sector 4, Dhaka"
                 required
@@ -410,10 +404,8 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
                 <Label htmlFor="bio">Short Bio (Optional)</Label>
                 <textarea
                   id="bio"
-                  name="bio"
                   rows={2}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
+                  {...register("bio")}
                   className="flex min-h-[70px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="Additional notes about your availability or preferred times..."
                 />

@@ -5,6 +5,8 @@ self.addEventListener('push', function (event) {
       body: data.body,
       icon: '/icon.png', // Optional: you can add a default icon in public/
       badge: '/badge.png', // Optional
+      tag: data.url ? `${data.url}-${Date.now()}` : `req-${Date.now()}`,
+      renotify: true,
       data: {
         url: data.url,
       },

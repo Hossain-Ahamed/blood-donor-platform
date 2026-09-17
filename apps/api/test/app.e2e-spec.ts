@@ -127,6 +127,29 @@ describe("AppController (e2e)", () => {
       createdResponseId = res.body.id;
     });
 
+    it("should fetch my response for the request as a donor", async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/requests/${createdRequestId}/my-response`)
+        .set("Authorization", `Bearer ${donorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty("id", createdResponseId);
+      expect(res.body).toHaveProperty("status", "OFFERED");
+    });
+
+    it("should fetch all responses for the request as the requester", async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/requests/${createdRequestId}/responses`)
+        .set("Authorization", `Bearer ${requesterToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      expect(res.body[0]).toHaveProperty("id", createdResponseId);
+      expect(res.body[0]).toHaveProperty("donor");
+      expect(res.body[0].donor).toHaveProperty("name");
+    });
+
     it("should accept the response", async () => {
       const res = await request(app.getHttpServer())
         .patch(`/responses/${createdResponseId}`)

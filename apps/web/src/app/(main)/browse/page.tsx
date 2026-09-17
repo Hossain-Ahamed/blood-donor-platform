@@ -35,13 +35,15 @@ export default async function BrowsePage({
   let user: User | null = null;
   let profileLocation: [number, number] | null = null;
   let profileAreaName: string | undefined = undefined;
+  let appliedRequestIds: string[] = [];
 
   try {
-    const [profileRes, userRes] = await Promise.allSettled([
+    const [profileRes, userRes, responsesRes] = await Promise.allSettled([
       apiServer.request<{ data: ProfileWithUser } | ProfileWithUser>(
         "/donor-profiles/me",
       ),
       apiServer.request<{ data: User } | User>("/users/me"),
+      apiServer.request<any[]>("/responses/me"),
     ]);
 
     if (profileRes.status === "fulfilled") {
@@ -63,6 +65,18 @@ export default async function BrowsePage({
     if (userRes.status === "fulfilled") {
       const val = userRes.value;
       user = "data" in val && val.data ? val.data : (val as User);
+    }
+
+    if (responsesRes.status === "fulfilled" && responsesRes.value) {
+      const val = responsesRes.value;
+      const list = Array.isArray(val)
+        ? val
+        : "data" in val && Array.isArray((val as any).data)
+          ? (val as any).data
+          : [];
+      appliedRequestIds = list
+        .filter((r: any) => r.status !== "CANCELLED")
+        .map((r: any) => r.request_id);
     }
   } catch (error) {
     console.warn("User not authenticated or profile not set:", error);
@@ -120,6 +134,7 @@ export default async function BrowsePage({
       initialBloodGroup={bloodGroup || "ALL"}
       initialRadiusKm={radiusKm}
       hasExplicitCoords={hasExplicitCoords}
+      appliedRequestIds={appliedRequestIds}
     />
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,102 +34,98 @@ import {
 } from "lucide-react";
 import { BloodGroup, ComponentType, UrgencyLevel } from "@repo/shared";
 
+interface RequestFormValues {
+  blood_group: BloodGroup;
+  component_type: ComponentType;
+  units_needed: number;
+  urgency: UrgencyLevel;
+  lat: number | null;
+  lng: number | null;
+  area_name: string;
+  hospital_name: string;
+  patient_name: string;
+  patient_age: string;
+  disease: string;
+  needed_time: string;
+  contact_phone: string;
+  patient_note: string;
+}
+
 export function RequestForm() {
   const router = useRouter();
 
-  // Patient details
-  const [patientName, setPatientName] = useState("");
-  const [patientAge, setPatientAge] = useState("");
-  const [disease, setDisease] = useState("");
-  const [neededTime, setNeededTime] = useState("");
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    formState: { isSubmitting },
+  } = useForm<RequestFormValues>({
+    defaultValues: {
+      blood_group: BloodGroup.O_POS,
+      component_type: ComponentType.WHOLE_BLOOD,
+      units_needed: 1,
+      urgency: UrgencyLevel.NORMAL,
+      lat: null,
+      lng: null,
+      area_name: "",
+      hospital_name: "",
+      patient_name: "",
+      patient_age: "",
+      disease: "",
+      needed_time: "",
+      contact_phone: "",
+      patient_note: "",
+    },
+  });
 
-  // Blood details
-  const [bloodGroup, setBloodGroup] = useState<string>("O_POS");
-  const [urgency, setUrgency] = useState<string>("NORMAL");
-  const [componentType, setComponentType] = useState<string>("WHOLE_BLOOD");
-  const [unitsNeeded, setUnitsNeeded] = useState("1");
+  const lat = useWatch({ control, name: "lat" });
+  const lng = useWatch({ control, name: "lng" });
+  const areaName = useWatch({ control, name: "area_name" });
 
-  // Hospital & Location details
-  const [hospitalName, setHospitalName] = useState("");
-  const [areaName, setAreaName] = useState("");
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
-
-  // Contact & Notes
-  const [contactPhone, setContactPhone] = useState("");
-  const [patientNote, setPatientNote] = useState("");
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleLocationChange = (
-    newLat: number,
-    newLng: number,
-    suggestedArea?: string,
-  ) => {
-    setLat(newLat);
-    setLng(newLng);
-    if (suggestedArea) {
-      setAreaName(suggestedArea);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!bloodGroup) {
+  const onSubmit = async (data: RequestFormValues) => {
+    if (!data.blood_group) {
       toast.error("Please select the required blood group");
       return;
     }
 
-    if (!contactPhone.trim()) {
+    if (!data.contact_phone.trim()) {
       toast.error("Please provide a contact phone number");
       return;
     }
 
-    if (lat === null || lng === null) {
+    if (data.lat === null || data.lng === null) {
       toast.error("Please set the hospital / donation location pin on the map");
       return;
     }
 
-    if (!areaName.trim()) {
+    if (!data.area_name.trim()) {
       toast.error("Please provide the area or hospital locality name");
       return;
     }
 
-    setIsSubmitting(true);
+    const units = Number(data.units_needed) || 1;
+
     try {
-      const payload: {
-        blood_group: BloodGroup;
-        component_type: ComponentType;
-        units_needed: number;
-        urgency: UrgencyLevel;
-        lat: number;
-        lng: number;
-        area_name: string;
-        hospital_name?: string;
-        patient_name?: string;
-        patient_age?: number;
-        disease?: string;
-        needed_time?: string;
-        contact_phone: string;
-        patient_note?: string;
-      } = {
-        blood_group: bloodGroup as BloodGroup,
-        component_type: componentType as ComponentType,
-        units_needed: parseInt(unitsNeeded, 10) || 1,
-        urgency: urgency as UrgencyLevel,
-        lat: Number(lat),
-        lng: Number(lng),
-        area_name: areaName.trim(),
-        hospital_name: hospitalName.trim() || undefined,
-        patient_name: patientName.trim() || undefined,
-        patient_age: patientAge ? parseInt(patientAge, 10) : undefined,
-        disease: disease.trim() || undefined,
-        needed_time: neededTime
-          ? new Date(neededTime).toISOString()
+      const payload: Record<string, unknown> = {
+        blood_group: data.blood_group,
+        component_type: data.component_type,
+        units_needed: units,
+        urgency: data.urgency,
+        lat: Number(data.lat),
+        lng: Number(data.lng),
+        area_name: data.area_name.trim(),
+        hospital_name: data.hospital_name.trim() || undefined,
+        patient_name: data.patient_name.trim() || undefined,
+        patient_age: data.patient_age
+          ? parseInt(data.patient_age, 10)
           : undefined,
-        contact_phone: contactPhone.trim(),
-        patient_note: patientNote.trim() || undefined,
+        disease: data.disease.trim() || undefined,
+        needed_time: data.needed_time
+          ? new Date(data.needed_time).toISOString()
+          : undefined,
+        contact_phone: data.contact_phone.trim(),
+        patient_note: data.patient_note.trim() || undefined,
       };
 
       const res = await apiClient.request<
@@ -153,14 +149,12 @@ export function RequestForm() {
       } else {
         toast.error("Failed to create blood request. Please check inputs.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
     <Card className="border-red-100 dark:border-red-900/30 shadow-sm">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit(onSubmit)}>
         <div className="bg-red-50 dark:bg-red-900/20 p-4 border-b border-red-100 dark:border-red-900/30 flex gap-3 items-start text-red-800 dark:text-red-300">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <p className="text-sm">
@@ -189,9 +183,7 @@ export function RequestForm() {
               <Label htmlFor="patientName">Patient Name</Label>
               <Input
                 id="patientName"
-                name="patientName"
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
+                {...register("patient_name")}
                 placeholder="e.g. Mohammad Rahman"
               />
             </div>
@@ -200,12 +192,10 @@ export function RequestForm() {
               <Label htmlFor="patientAge">Patient Age</Label>
               <Input
                 id="patientAge"
-                name="patientAge"
                 type="number"
                 min="0"
                 max="120"
-                value={patientAge}
-                onChange={(e) => setPatientAge(e.target.value)}
+                {...register("patient_age")}
                 placeholder="e.g. 35"
               />
             </div>
@@ -216,9 +206,7 @@ export function RequestForm() {
               <Label htmlFor="disease">Disease / Reason for Blood</Label>
               <Input
                 id="disease"
-                name="disease"
-                value={disease}
-                onChange={(e) => setDisease(e.target.value)}
+                {...register("disease")}
                 placeholder="e.g. Thalassemia, Surgery, Accident, Anemia"
               />
             </div>
@@ -230,10 +218,8 @@ export function RequestForm() {
               </Label>
               <Input
                 id="neededTime"
-                name="neededTime"
                 type="datetime-local"
-                value={neededTime}
-                onChange={(e) => setNeededTime(e.target.value)}
+                {...register("needed_time")}
               />
               <p className="text-xs text-muted-foreground">
                 Specify the exact date and time blood is required at the
@@ -254,100 +240,123 @@ export function RequestForm() {
                 <Label htmlFor="bloodGroup">
                   Required Blood Group <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={bloodGroup}
-                  onValueChange={(val: string | null) =>
-                    val && setBloodGroup(val)
-                  }
-                >
-                  <SelectTrigger id="bloodGroup">
-                    <SelectValue placeholder="Select Blood Group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="A_POS" label="A+">
-                      A+
-                    </SelectItem>
-                    <SelectItem value="A_NEG" label="A-">
-                      A-
-                    </SelectItem>
-                    <SelectItem value="B_POS" label="B+">
-                      B+
-                    </SelectItem>
-                    <SelectItem value="B_NEG" label="B-">
-                      B-
-                    </SelectItem>
-                    <SelectItem value="O_POS" label="O+">
-                      O+
-                    </SelectItem>
-                    <SelectItem value="O_NEG" label="O-">
-                      O-
-                    </SelectItem>
-                    <SelectItem value="AB_POS" label="AB+">
-                      AB+
-                    </SelectItem>
-                    <SelectItem value="AB_NEG" label="AB-">
-                      AB-
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="blood_group"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val: string | null) =>
+                        val && field.onChange(val as BloodGroup)
+                      }
+                    >
+                      <SelectTrigger id="bloodGroup">
+                        <SelectValue placeholder="Select Blood Group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A_POS" label="A+">
+                          A+
+                        </SelectItem>
+                        <SelectItem value="A_NEG" label="A-">
+                          A-
+                        </SelectItem>
+                        <SelectItem value="B_POS" label="B+">
+                          B+
+                        </SelectItem>
+                        <SelectItem value="B_NEG" label="B-">
+                          B-
+                        </SelectItem>
+                        <SelectItem value="O_POS" label="O+">
+                          O+
+                        </SelectItem>
+                        <SelectItem value="O_NEG" label="O-">
+                          O-
+                        </SelectItem>
+                        <SelectItem value="AB_POS" label="AB+">
+                          AB+
+                        </SelectItem>
+                        <SelectItem value="AB_NEG" label="AB-">
+                          AB-
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="urgency">
                   Urgency Level <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={urgency}
-                  onValueChange={(val: string | null) => val && setUrgency(val)}
-                >
-                  <SelectTrigger id="urgency">
-                    <SelectValue placeholder="Select urgency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NORMAL" label="Normal">
-                      Normal
-                    </SelectItem>
-                    <SelectItem value="URGENT" label="Urgent (Within 24h)">
-                      Urgent (Within 24h)
-                    </SelectItem>
-                    <SelectItem value="CRITICAL" label="Critical (Immediate)">
-                      Critical (Immediate)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="urgency"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val: string | null) =>
+                        val && field.onChange(val as UrgencyLevel)
+                      }
+                    >
+                      <SelectTrigger id="urgency">
+                        <SelectValue placeholder="Select urgency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NORMAL" label="Normal">
+                          Normal
+                        </SelectItem>
+                        <SelectItem value="URGENT" label="Urgent (Within 24h)">
+                          Urgent (Within 24h)
+                        </SelectItem>
+                        <SelectItem
+                          value="CRITICAL"
+                          label="Critical (Immediate)"
+                        >
+                          Critical (Immediate)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div className="grid gap-2">
                 <Label htmlFor="componentType">Component Type</Label>
-                <Select
-                  value={componentType}
-                  onValueChange={(val: string | null) =>
-                    val && setComponentType(val)
-                  }
-                >
-                  <SelectTrigger id="componentType">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="WHOLE_BLOOD" label="Whole Blood">
-                      Whole Blood
-                    </SelectItem>
-                    <SelectItem value="PLATELETS" label="Platelets">
-                      Platelets
-                    </SelectItem>
-                    <SelectItem value="PLASMA" label="Plasma">
-                      Plasma
-                    </SelectItem>
-                    <SelectItem value="RBC" label="Red Blood Cells (RBC)">
-                      Red Blood Cells (RBC)
-                    </SelectItem>
-                    <SelectItem value="CRYO" label="Cryoprecipitate">
-                      Cryoprecipitate
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="component_type"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val: string | null) =>
+                        val && field.onChange(val as ComponentType)
+                      }
+                    >
+                      <SelectTrigger id="componentType">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="WHOLE_BLOOD" label="Whole Blood">
+                          Whole Blood
+                        </SelectItem>
+                        <SelectItem value="PLATELETS" label="Platelets">
+                          Platelets
+                        </SelectItem>
+                        <SelectItem value="PLASMA" label="Plasma">
+                          Plasma
+                        </SelectItem>
+                        <SelectItem value="RBC" label="Red Blood Cells (RBC)">
+                          Red Blood Cells (RBC)
+                        </SelectItem>
+                        <SelectItem value="CRYO" label="Cryoprecipitate">
+                          Cryoprecipitate
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div className="grid gap-2">
@@ -356,12 +365,10 @@ export function RequestForm() {
                 </Label>
                 <Input
                   id="units"
-                  name="units"
                   type="number"
                   min="1"
                   max="50"
-                  value={unitsNeeded}
-                  onChange={(e) => setUnitsNeeded(e.target.value)}
+                  {...register("units_needed", { valueAsNumber: true })}
                   required
                 />
               </div>
@@ -379,9 +386,7 @@ export function RequestForm() {
               <Label htmlFor="hospital">Hospital / Medical Center Name</Label>
               <Input
                 id="hospital"
-                name="hospital"
-                value={hospitalName}
-                onChange={(e) => setHospitalName(e.target.value)}
+                {...register("hospital_name")}
                 placeholder="e.g. Dhaka Medical College Hospital, Shahbagh"
               />
             </div>
@@ -390,8 +395,14 @@ export function RequestForm() {
               lat={lat}
               lng={lng}
               areaName={areaName}
-              onLocationChange={handleLocationChange}
-              onAreaNameChange={(name) => setAreaName(name)}
+              onLocationChange={(newLat, newLng, suggestedArea) => {
+                setValue("lat", newLat);
+                setValue("lng", newLng);
+                if (suggestedArea) {
+                  setValue("area_name", suggestedArea);
+                }
+              }}
+              onAreaNameChange={(name) => setValue("area_name", name)}
               areaInputLabel="Hospital Locality / Area Name"
               areaInputPlaceholder="e.g. Shahbagh, Dhaka"
               required
@@ -411,10 +422,8 @@ export function RequestForm() {
               </Label>
               <Input
                 id="phone"
-                name="phone"
                 type="tel"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
+                {...register("contact_phone")}
                 placeholder="+880 1XXXXXXXXX"
                 required
               />
@@ -430,10 +439,8 @@ export function RequestForm() {
               </Label>
               <textarea
                 id="note"
-                name="note"
                 rows={3}
-                value={patientNote}
-                onChange={(e) => setPatientNote(e.target.value)}
+                {...register("patient_note")}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="e.g. Bed number, cabin number, attendent contact, specific requirements..."
               />

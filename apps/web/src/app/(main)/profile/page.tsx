@@ -1,8 +1,9 @@
+import { redirect } from "next/navigation";
 import { apiServer } from "@/lib/api/server";
-import { ProfileForm } from "./ProfileForm";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Badge } from "@/components/ui/badge";
 import type { DonorProfile, User } from "@repo/shared";
+import { ProfileForm } from "./ProfileForm";
 
 type ProfileWithUser = DonorProfile & { user?: User };
 
@@ -28,6 +29,10 @@ export default async function ProfilePage() {
     }
   } catch (error) {
     console.error("Error loading profile data", error);
+  }
+
+  if (!user) {
+    redirect("/login?redirect=/profile");
   }
 
   const isAvailable = profile?.is_available;
