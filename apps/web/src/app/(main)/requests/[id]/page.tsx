@@ -160,31 +160,14 @@ export default async function RequestDetailPage({
           <h1 className="text-3xl font-bold tracking-tight">
             Need {getLabel(bloodGroupLabels, request.blood_group)}
           </h1>
-          <div className="flex items-center gap-2.5 mt-3">
-            <Avatar className="h-9 w-9 border border-muted-foreground/20 shadow-sm shrink-0">
-              <AvatarImage
-                src={request.requester?.avatar_url || undefined}
-                alt={request.requester?.name || "Requester"}
-              />
-              <AvatarFallback className="font-semibold text-xs bg-red-100 text-red-600 dark:bg-red-950/80 dark:text-red-400">
-                {request.requester?.name
-                  ? request.requester.name.charAt(0).toUpperCase()
-                  : "R"}
-              </AvatarFallback>
-            </Avatar>
-            <p className="text-sm text-muted-foreground">
-              Posted by{" "}
-              <span className="font-semibold text-foreground">
-                {request.requester?.name || "Anonymous Requester"}
-              </span>{" "}
-              •{" "}
-              {new Date(request.created_at).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Requested on{" "}
+            {new Date(request.created_at).toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-center">
