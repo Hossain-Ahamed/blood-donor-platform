@@ -257,37 +257,33 @@ export default async function RequestDetailPage({
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Posted on{" "}
-                    {new Date(request.created_at).toLocaleDateString(
-                      undefined,
-                      {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      },
+                  <div className="flex flex-wrap items-center gap-y-1 gap-x-2 text-xs text-muted-foreground pt-0.5">
+                    <span>
+                      Posted on{" "}
+                      {new Date(request.created_at).toLocaleString(
+                        undefined,
+                        {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        },
+                      )}
+                    </span>
+                    {(request.requester_profile?.area_name ||
+                      request.area_name) && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 font-medium text-foreground">
+                          <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                          {request.requester_profile?.area_name ||
+                            request.area_name}
+                        </span>
+                      </>
                     )}
-                  </p>
-                  {request.requester_profile?.blood_group && (
-                    <div className="flex items-center gap-2 pt-1 text-xs">
-                      <span className="text-muted-foreground">
-                        Donor Blood Group:
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="font-semibold text-red-600 border-red-200 dark:border-red-900"
-                      >
-                        {getLabel(
-                          bloodGroupLabels,
-                          request.requester_profile.blood_group,
-                        )}
-                      </Badge>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
-              {request.contact_phone && (
+              {request.requester?.phone ? (
                 <div className="mt-4 pt-3.5 border-t border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-red-50/60 dark:bg-red-950/20 p-3.5 rounded-xl border border-red-100 dark:border-red-900/40">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-full bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 shrink-0">
@@ -295,17 +291,17 @@ export default async function RequestDetailPage({
                     </div>
                     <div>
                       <span className="text-[11px] font-medium text-muted-foreground block">
-                        Direct Contact Phone (Public)
+                        Requester Call Number
                       </span>
                       <a
-                        href={`tel:${request.contact_phone}`}
-                        className="font-bold text-base text-red-700 dark:text-red-300 hover:underline tracking-wide"
+                        href={`tel:${request.requester.phone}`}
+                        className="font-bold text-base text-red-700 dark:text-red-300 hover:underline tracking-wide font-mono"
                       >
-                        {request.contact_phone}
+                        {request.requester.phone}
                       </a>
                     </div>
                   </div>
-                  <a href={`tel:${request.contact_phone}`}>
+                  <a href={`tel:${request.requester.phone}`}>
                     <Button
                       size="sm"
                       className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-9 px-4 shadow-sm flex items-center gap-1.5"
@@ -314,6 +310,10 @@ export default async function RequestDetailPage({
                       Call Requester
                     </Button>
                   </a>
+                </div>
+              ) : (
+                <div className="mt-4 pt-3 border-t text-xs text-muted-foreground italic">
+                  Requester phone number not available
                 </div>
               )}
             </CardContent>
@@ -401,7 +401,7 @@ export default async function RequestDetailPage({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Contact Phone
+                    Form Contact Phone
                   </p>
                   {request.contact_phone ? (
                     <a
@@ -544,7 +544,7 @@ export default async function RequestDetailPage({
                     {request.contact_phone && (
                       <div className="rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-3.5 text-center space-y-2">
                         <span className="text-xs text-muted-foreground font-medium block">
-                          Direct Requester Phone (Public):
+                          Form Contact Phone (Public):
                         </span>
                         <a
                           href={`tel:${request.contact_phone}`}
