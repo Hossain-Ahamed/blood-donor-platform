@@ -12,6 +12,7 @@ import { Donation } from "../../entities/donation.entity";
 import { DonorProfile } from "../../entities/donor-profile.entity";
 import { User } from "../../entities/user.entity";
 import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
+import { DonorProfilesService, calculateAge } from "../donor-profiles/donor-profiles.service";
 import { ResponseStatus, RequestStatus } from "@repo/shared";
 
 @Injectable()
@@ -77,12 +78,19 @@ export class ResponsesService {
     }
 
     // Donor must have a completed profile to respond
+    // Donor must have a completed profile and phone number to respond
     const donorProfile = await this.donorProfileRepository.findOne({
       where: { user_id: donorId },
+      relations: ["user"],
     });
     if (!donorProfile || !donorProfile.blood_group) {
       throw new BadRequestException(
         "You must complete your donor profile with your blood group and details before responding to a blood request",
+      );
+    }
+    if (!donorProfile.user?.phone) {
+      throw new BadRequestException(
+        "You must have a contact phone number in your profile before responding to a blood request",
       );
     }
 
@@ -130,6 +138,10 @@ export class ResponsesService {
 
     return responses.map((r) => {
       const profile = profileMap.get(r.donor_id);
+      const computedAge = profile?.date_of_birth
+        ? (calculateAge(profile.date_of_birth) ?? profile.age)
+        : profile?.age;
+
       return {
         id: r.id,
         request_id: r.request_id,
@@ -152,7 +164,7 @@ export class ResponsesService {
                     email: r.donor.email,
                     is_available: profile?.is_available,
                     last_donation_date: profile?.last_donation_date,
-                    age: profile?.age,
+                    age: computedAge,
                     date_of_birth: profile?.date_of_birth,
                     religion: profile?.religion,
                     bio: profile?.bio,

@@ -326,6 +326,43 @@ export function RequesterResponsesCard({
                               )}
                             </span>
                           </div>
+
+                          {/* Key Donor Info Strip: Contact, Age, Religion */}
+                          <div className="flex items-center gap-2 pt-1 text-xs flex-wrap">
+                            {donor?.phone && (
+                              <a
+                                href={`tel:${donor.phone}`}
+                                className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 px-2 py-0.5 rounded-md hover:underline"
+                                title="Call donor"
+                              >
+                                <Phone className="w-3 h-3" />
+                                {donor.phone}
+                              </a>
+                            )}
+                            {donor?.age !== undefined && donor?.age !== null && (
+                              <span className="inline-flex items-center gap-1 text-purple-700 dark:text-purple-300 font-medium bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/50 px-2 py-0.5 rounded-md">
+                                <Calendar className="w-3 h-3" />
+                                {donor.age} yrs
+                              </span>
+                            )}
+                            {donor?.religion && (
+                              <span className="inline-flex items-center gap-1 text-indigo-700 dark:text-indigo-300 font-medium bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 px-2 py-0.5 rounded-md">
+                                <HeartHandshake className="w-3 h-3" />
+                                {donor.religion}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Medical / Health Notes Callout */}
+                          {donor?.health_notes && (
+                            <div className="mt-1.5 text-xs bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 px-2.5 py-1.5 rounded-md flex items-start gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                              <div className="leading-snug">
+                                <span className="font-semibold">Medical Note: </span>
+                                <span>{donor.health_notes}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -541,19 +578,30 @@ export function RequesterResponsesCard({
                       : "Age not specified"}
                   </span>
                 </div>
+
+                {/* Religion */}
+                <div className="p-2.5 rounded-lg border bg-card/60">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                    <HeartHandshake className="w-3 h-3 text-indigo-600" />
+                    Religion
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {selectedDonorForProfile.donor?.religion || "Not specified"}
+                  </span>
+                </div>
               </div>
 
-              {/* Bio & Health Notes (if present) */}
-              {selectedDonorForProfile.donor?.health_notes && (
-                <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/20 text-xs">
-                  <span className="font-semibold text-amber-700 dark:text-amber-400 block mb-1">
-                    Donor Health Notes:
-                  </span>
-                  <p className="text-foreground">
-                    {selectedDonorForProfile.donor.health_notes}
-                  </p>
-                </div>
-              )}
+              {/* Bio & Health Notes */}
+              <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/20 text-xs space-y-1">
+                <span className="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  Donor Medical / Health Notes:
+                </span>
+                <p className="text-foreground leading-relaxed">
+                  {selectedDonorForProfile.donor?.health_notes ||
+                    "No medical conditions or health restrictions noted by donor."}
+                </p>
+              </div>
 
               {selectedDonorForProfile.donor?.bio && (
                 <div className="p-3 rounded-lg border bg-muted/20 text-xs">

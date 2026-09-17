@@ -17,7 +17,15 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, ExternalLink } from "lucide-react";
+import {
+  MapPin,
+  Navigation,
+  ExternalLink,
+  ShieldCheck,
+  User as UserIcon,
+  Phone,
+} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RequestManagementCard } from "./RequestManagementCard";
 import {
   DonorResponseActionCard,
@@ -27,21 +35,33 @@ import {
   RequesterResponsesCard,
   type RequesterDonorResponse,
 } from "./RequesterResponsesCard";
-import { RequesterInfoCard } from "./RequesterInfoCard";
-import type { BloodRequest, DonorProfile, User } from "@repo/shared";
+import type {
+  BloodRequest,
+  DonorProfile,
+  User,
+  BloodGroup,
+} from "@repo/shared";
 
 type BloodRequestDetail = BloodRequest & {
   location?: {
     type: string;
     coordinates: [number, number];
   };
-  requester?: User;
+  requester?: {
+    id: string;
+    name: string;
+    avatar_url?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    role?: string;
+    created_at?: string | Date;
+  } | null;
   requester_profile?: {
-    area_name?: string;
-    blood_group?: string;
-    is_available?: boolean;
-    last_donation_date?: string;
-  };
+    area_name?: string | null;
+    blood_group?: BloodGroup | null;
+    is_available?: boolean | null;
+    last_donation_date?: string | Date | null;
+  } | null;
 };
 
 type ProfileWithUser = DonorProfile & { user?: User };
@@ -135,30 +155,169 @@ export default async function RequestDetailPage({
 
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-5xl">
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Need {getLabel(bloodGroupLabels, request.blood_group)}
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Requested on {new Date(request.created_at).toLocaleDateString()}
-          </p>
+          <div className="flex items-center gap-2.5 mt-3">
+            <Avatar className="h-9 w-9 border border-muted-foreground/20 shadow-sm shrink-0">
+              <AvatarImage
+                src={request.requester?.avatar_url || undefined}
+                alt={request.requester?.name || "Requester"}
+              />
+              <AvatarFallback className="font-semibold text-xs bg-red-100 text-red-600 dark:bg-red-950/80 dark:text-red-400">
+                {request.requester?.name
+                  ? request.requester.name.charAt(0).toUpperCase()
+                  : "R"}
+              </AvatarFallback>
+            </Avatar>
+            <p className="text-sm text-muted-foreground">
+              Posted by{" "}
+              <span className="font-semibold text-foreground">
+                {request.requester?.name || "Anonymous Requester"}
+              </span>{" "}
+              •{" "}
+              {new Date(request.created_at).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </p>
+          </div>
         </div>
-        <Badge
-          variant={request.urgency === "CRITICAL" ? "destructive" : "default"}
-          className="text-lg px-4 py-1"
-        >
-          {getLabel(urgencyLabels, request.urgency)}
-        </Badge>
+
+        <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-center">
+          {user?.role === "ADMIN" && (
+            <Link href={`/admin/requests?requestId=${request.id}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50 flex items-center gap-1.5 font-semibold text-xs h-9 shadow-sm"
+              >
+                <ShieldCheck className="w-4 h-4 text-red-600 shrink-0" />
+                <span>Show full detail</span>
+                <ExternalLink className="w-3.5 h-3.5 ml-0.5 opacity-70" />
+              </Button>
+            </Link>
+          )}
+
+          <Badge
+            variant={request.urgency === "CRITICAL" ? "destructive" : "default"}
+            className="text-base md:text-lg px-4 py-1"
+          >
+            {getLabel(urgencyLabels, request.urgency)}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <RequesterInfoCard
-            requester={request.requester}
-            contactPhone={request.contact_phone}
-            requesterProfile={request.requester_profile}
-          />
+          {/* Requester Information Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base md:text-lg font-bold flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-red-600 shrink-0" />
+                Requester Information
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Details of the person who initiated this blood request
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-14 w-14 border border-muted-foreground/20 shadow-sm shrink-0">
+                  <AvatarImage
+                    src={request.requester?.avatar_url || undefined}
+                    alt={request.requester?.name || "Requester"}
+                  />
+                  <AvatarFallback className="font-bold text-lg bg-red-100 text-red-600 dark:bg-red-950/80 dark:text-red-400">
+                    {request.requester?.name
+                      ? request.requester.name.charAt(0).toUpperCase()
+                      : "R"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-base text-foreground truncate">
+                      {request.requester?.name || "Anonymous Requester"}
+                    </p>
+                    <Badge
+                      variant="secondary"
+                      className="text-xs font-semibold"
+                    >
+                      Requester
+                    </Badge>
+                    {isOwnRequest && (
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-emerald-300 text-emerald-700 dark:text-emerald-400 dark:border-emerald-800"
+                      >
+                        Your Request
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Posted on{" "}
+                    {new Date(request.created_at).toLocaleDateString(
+                      undefined,
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      },
+                    )}
+                  </p>
+                  {request.requester_profile?.blood_group && (
+                    <div className="flex items-center gap-2 pt-1 text-xs">
+                      <span className="text-muted-foreground">
+                        Donor Blood Group:
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="font-semibold text-red-600 border-red-200 dark:border-red-900"
+                      >
+                        {getLabel(
+                          bloodGroupLabels,
+                          request.requester_profile.blood_group,
+                        )}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {request.contact_phone && (
+                <div className="mt-4 pt-3.5 border-t border-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-red-50/60 dark:bg-red-950/20 p-3.5 rounded-xl border border-red-100 dark:border-red-900/40">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-full bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 shrink-0">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-medium text-muted-foreground block">
+                        Direct Contact Phone (Public)
+                      </span>
+                      <a
+                        href={`tel:${request.contact_phone}`}
+                        className="font-bold text-base text-red-700 dark:text-red-300 hover:underline tracking-wide"
+                      >
+                        {request.contact_phone}
+                      </a>
+                    </div>
+                  </div>
+                  <a href={`tel:${request.contact_phone}`}>
+                    <Button
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-9 px-4 shadow-sm flex items-center gap-1.5"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      Call Requester
+                    </Button>
+                  </a>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -239,6 +398,22 @@ export default async function RequestDetailPage({
                   <p className="font-medium">
                     {getLabel(requestStatusLabels, request.status)}
                   </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Contact Phone
+                  </p>
+                  {request.contact_phone ? (
+                    <a
+                      href={`tel:${request.contact_phone}`}
+                      className="font-semibold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 mt-0.5"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      {request.contact_phone}
+                    </a>
+                  ) : (
+                    <p className="font-medium">Not provided</p>
+                  )}
                 </div>
               </div>
 
@@ -364,12 +539,42 @@ export default async function RequestDetailPage({
                         You must be logged in to offer a blood donation for this
                         request.
                       </p>
+                    </div>
+
+                    {request.contact_phone && (
+                      <div className="rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-3.5 text-center space-y-2">
+                        <span className="text-xs text-muted-foreground font-medium block">
+                          Direct Requester Phone (Public):
+                        </span>
+                        <a
+                          href={`tel:${request.contact_phone}`}
+                          className="font-bold text-base text-red-600 dark:text-red-400 hover:underline flex items-center justify-center gap-1.5 tracking-wide"
+                        >
+                          <Phone className="w-4 h-4" />
+                          {request.contact_phone}
+                        </a>
+                        <a href={`tel:${request.contact_phone}`} className="block pt-1">
+                          <Button
+                            size="sm"
+                            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-8 shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            Call Now
+                          </Button>
+                        </a>
+                      </div>
+                    )}
+
+                    <div className="space-y-2.5 text-center pt-1">
+                      <p className="text-xs text-muted-foreground">
+                        Sign in to offer blood donation and track coordination directly.
+                      </p>
                       <Link href={`/login?redirect=/requests/${id}`}>
                         <Button
                           size="lg"
-                          className="w-full bg-red-600 hover:bg-red-700 text-white"
+                          className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold"
                         >
-                          Login to Donate
+                          Login to Offer Blood
                         </Button>
                       </Link>
                     </div>
@@ -384,13 +589,28 @@ export default async function RequestDetailPage({
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {request.contact_phone && (
+                      <div className="rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-3.5 text-center space-y-2">
+                        <span className="text-xs text-muted-foreground font-medium block">
+                          Need to coordinate immediately?
+                        </span>
+                        <a
+                          href={`tel:${request.contact_phone}`}
+                          className="font-bold text-base text-red-600 dark:text-red-400 hover:underline flex items-center justify-center gap-1.5"
+                        >
+                          <Phone className="w-4 h-4" />
+                          {request.contact_phone}
+                        </a>
+                      </div>
+                    )}
+
                     <div className="space-y-3">
                       <p className="text-sm text-amber-700 dark:text-amber-400 font-medium text-center">
                         Profile Information Required
                       </p>
                       <p className="text-xs text-muted-foreground text-center">
-                        You need to complete your donor profile (with your blood
-                        group and location) before responding.
+                        Please ensure your donor profile has your blood group
+                        and location before offering to donate.
                       </p>
                       <Link href={`/profile?redirect=/requests/${id}`}>
                         <Button
@@ -436,9 +656,7 @@ export default async function RequestDetailPage({
                   requestId={id}
                   initialResponse={myResponse}
                   requestStatus={request.status}
-                  requesterContactPhone={
-                    request.contact_phone || request.requester?.phone
-                  }
+                  requesterContactPhone={request.contact_phone}
                   requesterName={
                     request.requester?.name || request.patient_name
                   }

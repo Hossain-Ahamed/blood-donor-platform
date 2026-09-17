@@ -41,7 +41,7 @@ export default async function NewRequestPage() {
       user = "data" in val && val.data ? val.data : (val as User);
     }
   } catch (error) {
-    console.error("Error checking donor profile for new request page:", error);
+    console.error("Error checking profile for new request page:", error);
   }
 
   const isProfileComplete = Boolean(profile && profile.blood_group);

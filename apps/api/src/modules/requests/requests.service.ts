@@ -84,6 +84,17 @@ export class RequestsService {
 
     const savedRequest = await this.requestRepository.save(request);
 
+    // If the requester doesn't have a phone number set, persist the contact phone
+    if (dto.contact_phone) {
+      this.requestRepository.manager
+        .createQueryBuilder()
+        .update("users")
+        .set({ phone: dto.contact_phone })
+        .where("id = :userId AND (phone IS NULL OR phone = '')", { userId })
+        .execute()
+        .catch((e) => this.logger.warn(`Failed to update user phone: ${e}`));
+    }
+
     // Trigger notification async
     this.donorProfilesService
       .findNearby(dto.lat, dto.lng, 10, dto.blood_group)

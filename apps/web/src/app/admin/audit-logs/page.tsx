@@ -266,7 +266,7 @@ export default function AdminAuditLogsPage() {
         open={!!selectedMeta}
         onOpenChange={(open) => !open && setSelectedMeta(null)}
       >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Audit Log Metadata</DialogTitle>
           </DialogHeader>

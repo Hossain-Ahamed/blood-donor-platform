@@ -432,8 +432,7 @@ export function RequestForm({ initialPhone = "" }: RequestFormProps = {}) {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Will only be revealed to verified donors who accept this
-                request.
+                This phone number will be displayed on the request page so donors and volunteers can call and coordinate immediately.
               </p>
             </div>
 
