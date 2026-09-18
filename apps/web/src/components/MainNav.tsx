@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export function MainNav() {
+export function MainNav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -27,23 +27,38 @@ export function MainNav() {
             ? "bg-red-600 text-white shadow-red-500/20"
             : "bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/40 dark:border-red-900/60 dark:text-red-400 hover:bg-red-600 hover:text-white",
         )}
-        href="/requests"
+        href={isLoggedIn ? "/requests" : "/login?redirect=/requests"}
       >
         <span className="text-sm font-bold leading-none">+</span>
         <span>Request</span>
         <span className="hidden sm:inline">Blood</span>
       </Link>
-      <Link
-        className={cn(
-          "text-xs sm:text-sm font-medium transition-colors px-2 py-1 rounded-md hover:text-red-600 hidden xs:inline-block sm:inline-block",
-          pathname?.startsWith("/history")
-            ? "text-red-600 font-semibold bg-red-50 dark:bg-red-950/40"
-            : "text-zinc-600 dark:text-zinc-400 hover:bg-muted/50",
-        )}
-        href="/history"
-      >
-        History
-      </Link>
+      {isLoggedIn && (
+        <>
+          <Link
+            className={cn(
+              "text-xs sm:text-sm font-medium transition-colors px-2 py-1 rounded-md hover:text-red-600 hidden xs:inline-block sm:inline-block",
+              pathname?.startsWith("/history")
+                ? "text-red-600 font-semibold bg-red-50 dark:bg-red-950/40"
+                : "text-zinc-600 dark:text-zinc-400 hover:bg-muted/50",
+            )}
+            href="/history"
+          >
+            History
+          </Link>
+          <Link
+            className={cn(
+              "text-xs sm:text-sm font-medium transition-colors px-2 py-1 rounded-md hover:text-red-600 hidden xs:inline-block sm:inline-block",
+              pathname?.startsWith("/friends")
+                ? "text-red-600 font-semibold bg-red-50 dark:bg-red-950/40"
+                : "text-zinc-600 dark:text-zinc-400 hover:bg-muted/50",
+            )}
+            href="/friends"
+          >
+            Friends
+          </Link>
+        </>
+      )}
     </nav>
   );
 }

@@ -272,7 +272,10 @@ export type SmartAlertType =
   | "NEARBY_REQUEST"
   | "OFFER_ACCEPTED"
   | "OFFER_RECEIVED"
-  | "DONATION_REMINDER";
+  | "DONATION_REMINDER"
+  | "FRIEND_REQUEST"
+  | "FRIEND_ACCEPTED"
+  | "FRIEND_BLOOD_REQUEST";
 
 export type SmartAlertUrgency = "CRITICAL" | "SUCCESS" | "WARNING" | "INFO";
 
@@ -292,5 +295,75 @@ export interface SmartFeedResponse {
   alerts: SmartAlertItem[];
   unreadCount: number;
   hasProfileLocation: boolean;
+}
+
+// 5. Friendship System
+export enum FriendshipStatus {
+  PENDING = "PENDING",
+  ACCEPTED = "ACCEPTED",
+  DECLINED = "DECLINED",
+}
+
+export type FriendshipRelationStatus =
+  | "NONE"
+  | "PENDING_SENT"
+  | "PENDING_RECEIVED"
+  | "FRIENDS";
+
+export interface FriendUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string | null;
+  phone?: string | null;
+  blood_group?: BloodGroup | null;
+  area_name?: string | null;
+  is_available?: boolean | null;
+  last_donation_date?: string | Date | null;
+  friendship_id?: string;
+  friendship_status?: FriendshipRelationStatus;
+  friend_since?: string | Date;
+}
+
+export interface FriendProfileDetail {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    avatar_url?: string | null;
+    phone?: string | null;
+    created_at: string | Date;
+  };
+  profile: {
+    blood_group: BloodGroup;
+    area_name: string;
+    is_available: boolean;
+    bio?: string | null;
+    age?: number | null;
+    date_of_birth?: string | Date | null;
+    religion?: string | null;
+    health_notes?: string | null;
+    last_donation_date?: string | Date | null;
+  } | null;
+  relationship: FriendshipRelationStatus;
+  friendship_id?: string | null;
+  donations: Array<{
+    id: string;
+    donation_date: string | Date;
+    area_name?: string;
+    hospital_name?: string;
+    blood_group?: BloodGroup;
+  }>;
+  requests: Array<{
+    id: string;
+    blood_group: BloodGroup;
+    urgency: UrgencyLevel;
+    units_needed: number;
+    units_fulfilled: number;
+    status: RequestStatus;
+    area_name: string;
+    hospital_name?: string;
+    created_at: string | Date;
+  }>;
 }
 

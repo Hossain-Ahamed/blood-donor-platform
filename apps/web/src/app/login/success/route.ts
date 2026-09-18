@@ -8,7 +8,12 @@ export async function GET(request: NextRequest) {
       process.env.NODE_ENV === "production" &&
       !process.env.NEXT_PUBLIC_API_URL?.includes("localhost");
 
-    const response = NextResponse.redirect(new URL("/browse", request.url));
+    const rawRedirect = request.cookies.get("post_login_redirect")?.value;
+    const decodedRedirect = rawRedirect ? decodeURIComponent(rawRedirect) : null;
+    const targetPath =
+      decodedRedirect && decodedRedirect.startsWith("/") ? decodedRedirect : "/browse";
+
+    const response = NextResponse.redirect(new URL(targetPath, request.url));
     response.cookies.set("access_token", token, {
       httpOnly: true,
       secure: isProduction,
@@ -16,6 +21,9 @@ export async function GET(request: NextRequest) {
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
+    if (rawRedirect) {
+      response.cookies.delete("post_login_redirect");
+    }
     return response;
   }
 

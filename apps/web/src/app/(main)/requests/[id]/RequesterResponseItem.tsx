@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ReportDialog } from "@/components/reports/ReportDialog";
 import { ReportTargetType } from "@repo/shared";
+import { FriendActionButton } from "@/components/friends/FriendActionButton";
 import type { RequesterDonorResponse } from "./RequesterResponsesCard";
 
 interface RequesterResponseItemProps {
@@ -188,6 +189,13 @@ export function RequesterResponseItem({
                 {donor.phone}
               </Button>
             </a>
+          )}
+
+          {item.status === "ACCEPTED" && item.donor_id && (
+            <FriendActionButton
+              targetUserId={item.donor_id}
+              size="sm"
+            />
           )}
 
           {item.donor_id && (

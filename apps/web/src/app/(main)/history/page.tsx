@@ -43,29 +43,47 @@ export default async function HistoryPage() {
   let requests: BloodRequestItem[] = [];
   let donations: DonationItem[] = [];
   let appliedResponses: AppliedResponseItem[] = [];
+  let shouldRedirectToLogin = false;
 
   try {
-    const [reqData, donData, respData] = await Promise.all([
-      apiServer
-        .request<{ data: BloodRequestItem[] } | BloodRequestItem[]>("/requests/me")
-        .catch(() => []),
-      apiServer
-        .request<{ data: DonationItem[] } | DonationItem[]>("/donations/me")
-        .catch(() => []),
-      apiServer
-        .request<{ data: AppliedResponseItem[] } | AppliedResponseItem[]>(
-          "/responses/me",
-        )
-        .catch(() => []),
+    const [reqRes, donRes, respRes] = await Promise.allSettled([
+      apiServer.request<{ data: BloodRequestItem[] } | BloodRequestItem[]>("/requests/me"),
+      apiServer.request<{ data: DonationItem[] } | DonationItem[]>("/donations/me"),
+      apiServer.request<{ data: AppliedResponseItem[] } | AppliedResponseItem[]>("/responses/me"),
     ]);
 
-    requests = Array.isArray(reqData) ? reqData : reqData?.data || [];
-    donations = Array.isArray(donData) ? donData : donData?.data || [];
-    appliedResponses = Array.isArray(respData)
-      ? respData
-      : respData?.data || [];
+    if (
+      (reqRes.status === "rejected" &&
+        ((reqRes.reason as any)?.status === 401 ||
+          (reqRes.reason as any)?.statusCode === 401)) ||
+      (donRes.status === "rejected" &&
+        ((donRes.reason as any)?.status === 401 ||
+          (donRes.reason as any)?.statusCode === 401)) ||
+      (respRes.status === "rejected" &&
+        ((respRes.reason as any)?.status === 401 ||
+          (respRes.reason as any)?.statusCode === 401))
+    ) {
+      shouldRedirectToLogin = true;
+    }
+
+    if (reqRes.status === "fulfilled") {
+      const val = reqRes.value;
+      requests = Array.isArray(val) ? val : val?.data || [];
+    }
+    if (donRes.status === "fulfilled") {
+      const val = donRes.value;
+      donations = Array.isArray(val) ? val : val?.data || [];
+    }
+    if (respRes.status === "fulfilled") {
+      const val = respRes.value;
+      appliedResponses = Array.isArray(val) ? val : val?.data || [];
+    }
   } catch (e) {
     console.error(e);
+  }
+
+  if (shouldRedirectToLogin) {
+    redirect("/login?redirect=/history");
   }
 
   const totalDonationItems = Math.max(

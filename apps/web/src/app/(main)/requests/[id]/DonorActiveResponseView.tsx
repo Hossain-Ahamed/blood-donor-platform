@@ -17,10 +17,12 @@ import {
   Phone,
   RotateCcw,
 } from "lucide-react";
+import { FriendActionButton } from "@/components/friends/FriendActionButton";
 import type { DonorResponse } from "./DonorResponseActionCard";
 
 interface DonorActiveResponseViewProps {
   response: DonorResponse;
+  requesterId?: string | null;
   requesterName?: string | null;
   requesterContactPhone?: string | null;
   isSubmitting: boolean;
@@ -31,6 +33,7 @@ interface DonorActiveResponseViewProps {
 
 export function DonorActiveResponseView({
   response,
+  requesterId,
   requesterName,
   requesterContactPhone,
   isSubmitting,
@@ -140,6 +143,13 @@ export function DonorActiveResponseView({
                 The requester has your contact details and will reach out to
                 coordinate with you shortly.
               </p>
+            )}
+
+            {requesterId && (
+              <div className="pt-2 border-t border-emerald-200 dark:border-emerald-900/60 flex items-center justify-between">
+                <span className="text-muted-foreground text-[11px]">Connect with requester:</span>
+                <FriendActionButton targetUserId={requesterId} size="sm" />
+              </div>
             )}
           </div>
         </CardContent>

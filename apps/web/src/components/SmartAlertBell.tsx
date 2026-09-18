@@ -12,6 +12,9 @@ import {
   CheckCheck,
   UserCheck,
   AlertCircle,
+  UserPlus,
+  HeartHandshake,
+  Heart,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -62,6 +65,24 @@ function getAlertIcon(type: string, urgency: string) {
       return (
         <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
           <Calendar className="w-4 h-4" />
+        </div>
+      );
+    case "FRIEND_REQUEST":
+      return (
+        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
+          <UserPlus className="w-4 h-4" />
+        </div>
+      );
+    case "FRIEND_ACCEPTED":
+      return (
+        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400">
+          <HeartHandshake className="w-4 h-4" />
+        </div>
+      );
+    case "FRIEND_BLOOD_REQUEST":
+      return (
+        <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center shrink-0 text-rose-600 dark:text-rose-400 animate-pulse">
+          <Heart className="w-4 h-4 fill-current" />
         </div>
       );
     default:

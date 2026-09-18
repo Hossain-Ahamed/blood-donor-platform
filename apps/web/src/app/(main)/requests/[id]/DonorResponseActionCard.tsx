@@ -28,6 +28,7 @@ export interface DonorResponse {
 
 interface DonorResponseActionCardProps {
   requestId: string;
+  requesterId?: string | null;
   initialResponse: DonorResponse | null;
   requestStatus: string;
   requesterContactPhone?: string | null;
@@ -38,6 +39,7 @@ interface DonorResponseActionCardProps {
 
 export function DonorResponseActionCard({
   requestId,
+  requesterId,
   initialResponse,
   requestStatus,
   requesterContactPhone,
@@ -155,6 +157,7 @@ export function DonorResponseActionCard({
     return (
       <DonorActiveResponseView
         response={response}
+        requesterId={requesterId}
         requesterName={requesterName}
         requesterContactPhone={requesterContactPhone}
         isSubmitting={isSubmitting}
@@ -253,7 +256,7 @@ export function DonorResponseActionCard({
             </Button>
 
             <p className="text-[11px] text-muted-foreground text-center leading-snug">
-              By offering, your contact phone and donor profile credentials will
+              By offering, your contact phone and donor profile will
               be shared with the patient attendant upon acceptance.
             </p>
           </div>

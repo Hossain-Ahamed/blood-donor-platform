@@ -6,6 +6,7 @@ import { DonorProfile } from "../../entities/donor-profile.entity";
 import { BloodRequest } from "../../entities/request.entity";
 import { Response } from "../../entities/response.entity";
 import { Donation } from "../../entities/donation.entity";
+import { Friendship } from "../../entities/friendship.entity";
 import { BloodGroup, RequestStatus, UrgencyLevel, ResponseStatus } from "@repo/shared";
 
 describe("SmartFeedService", () => {
@@ -15,6 +16,7 @@ describe("SmartFeedService", () => {
   let requestRepoMock: any;
   let responseRepoMock: any;
   let donationRepoMock: any;
+  let friendshipRepoMock: any;
 
   const mockUserId = "user-uuid-1234";
 
@@ -97,6 +99,19 @@ describe("SmartFeedService", () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockDonationQueryBuilder),
     };
 
+    const mockFriendshipQueryBuilder = {
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+
+    friendshipRepoMock = {
+      createQueryBuilder: jest.fn().mockReturnValue(mockFriendshipQueryBuilder),
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SmartFeedService,
@@ -115,6 +130,10 @@ describe("SmartFeedService", () => {
         {
           provide: getRepositoryToken(Donation),
           useValue: donationRepoMock,
+        },
+        {
+          provide: getRepositoryToken(Friendship),
+          useValue: friendshipRepoMock,
         },
         {
           provide: CACHE_MANAGER,

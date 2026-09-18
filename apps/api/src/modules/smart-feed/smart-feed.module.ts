@@ -6,6 +6,7 @@ import { DonorProfile } from "../../entities/donor-profile.entity";
 import { BloodRequest } from "../../entities/request.entity";
 import { Response } from "../../entities/response.entity";
 import { Donation } from "../../entities/donation.entity";
+import { Friendship } from "../../entities/friendship.entity";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { Donation } from "../../entities/donation.entity";
       BloodRequest,
       Response,
       Donation,
+      Friendship,
     ]),
   ],
   controllers: [SmartFeedController],

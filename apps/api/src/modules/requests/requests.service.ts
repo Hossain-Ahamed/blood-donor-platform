@@ -5,6 +5,8 @@ import {
   BadRequestException,
   Inject,
   Logger,
+  Optional,
+  forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -17,11 +19,13 @@ import {
   UpdateRequestDto,
   NearbyQueryDto,
 } from "./dto/request.dto";
-import { RequestStatus } from "@repo/shared";
+import { RequestStatus, formatBloodGroup } from "@repo/shared";
 import { Point } from "geojson";
 
 import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
 import { DonorProfilesService } from "../donor-profiles/donor-profiles.service";
+import { FriendsService } from "../friends/friends.service";
+import { SmartFeedService } from "../smart-feed/smart-feed.service";
 
 @Injectable()
 export class RequestsService {
@@ -35,6 +39,11 @@ export class RequestsService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly pushSubscriptionsService: PushSubscriptionsService,
     private readonly donorProfilesService: DonorProfilesService,
+    @Optional()
+    @Inject(forwardRef(() => FriendsService))
+    private readonly friendsService?: FriendsService,
+    @Optional()
+    private readonly smartFeedService?: SmartFeedService,
   ) {}
 
   async create(userId: string, dto: CreateRequestDto): Promise<BloodRequest> {
@@ -98,7 +107,7 @@ export class RequestsService {
     // Trigger notification async
     this.donorProfilesService
       .findNearby(dto.lat, dto.lng, 10, dto.blood_group)
-      .then((donors) => {
+      .then(async (donors) => {
         this.logger.log(
           `Found ${donors.length} nearby matching donors for ${dto.blood_group} request within 10km`,
         );
@@ -106,24 +115,65 @@ export class RequestsService {
           .map((d) => d.user_id)
           .filter((id) => id !== userId); // don't notify the requester themselves
 
-        if (donorUserIds.length === 0) {
-          this.logger.log(
-            `No other eligible donors to notify (total found: ${donors.length}, requester excluded: ${userId})`,
-          );
-          return;
+        // Fetch accepted friends of requester (friends will be notified without checking location and blood type!)
+        let friendUserIds: string[] = [];
+        if (this.friendsService?.getFriendUserIds) {
+          try {
+            friendUserIds = await this.friendsService.getFriendUserIds(userId);
+            this.logger.log(
+              `Found ${friendUserIds.length} accepted friend(s) to notify for blood request`,
+            );
+          } catch (err) {
+            this.logger.warn(
+              `Failed to retrieve friends for notification: ${err}`,
+            );
+          }
         }
 
-        const payload = {
-          title: `Urgent: ${dto.blood_group} Blood Needed!`,
-          body: `A new request for ${dto.blood_group} blood has been made in ${dto.area_name}.`,
-          url: `/requests/${savedRequest.id}`,
-        };
-        this.logger.log(
-          `Dispatching push notifications to ${donorUserIds.length} donor(s)`,
+        // Deduplicate: friends who are not already receiving the nearby donor notification
+        const friendOnlyUserIds = friendUserIds.filter(
+          (fId) => fId !== userId && !donorUserIds.includes(fId),
         );
-        this.pushSubscriptionsService.notifyUsers(donorUserIds, payload);
+
+        // 1. Notify nearby matching donors
+        if (donorUserIds.length > 0) {
+          const payload = {
+            title: `Urgent: ${formatBloodGroup(dto.blood_group)} Blood Needed!`,
+            body: `A new request for ${formatBloodGroup(dto.blood_group)} blood has been made in ${dto.area_name}.`,
+            url: `/requests/${savedRequest.id}`,
+          };
+          this.logger.log(
+            `Dispatching push notifications to ${donorUserIds.length} donor(s)`,
+          );
+          this.pushSubscriptionsService.notifyUsers(donorUserIds, payload);
+        }
+
+        // 2. Notify friends (unconditionally, without location or blood group filtering)
+        if (friendOnlyUserIds.length > 0) {
+          const friendPayload = {
+            title: `Friend In Need: Blood Requested!`,
+            body: `${user?.name || "Your friend"} needs ${formatBloodGroup(dto.blood_group)} blood in ${dto.area_name}.`,
+            url: `/requests/${savedRequest.id}`,
+          };
+          this.logger.log(
+            `Dispatching friend push notifications to ${friendOnlyUserIds.length} friend(s)`,
+          );
+          this.pushSubscriptionsService.notifyUsers(
+            friendOnlyUserIds,
+            friendPayload,
+          );
+        }
+
+        // Invalidate Smart Feed for all friends
+        if (this.smartFeedService?.invalidateFeedCache) {
+          for (const fId of friendUserIds) {
+            this.smartFeedService.invalidateFeedCache(fId).catch(() => {});
+          }
+        }
       })
-      .catch((err) => this.logger.error("Failed to notify donors:", err));
+      .catch((err) =>
+        this.logger.error("Failed to notify donors/friends:", err),
+      );
 
     return savedRequest;
   }

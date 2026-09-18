@@ -5,6 +5,8 @@ import { MainNav } from "@/components/MainNav";
 import { UserNav } from "@/components/UserNav";
 import { SmartAlertBell } from "@/components/SmartAlertBell";
 
+export const dynamic = "force-dynamic";
+
 export default async function MainLayout({
   children,
 }: {
@@ -14,13 +16,10 @@ export default async function MainLayout({
   try {
     const res = await apiServer.request<{ data: any }>("/users/me");
     user = res?.data || res; // depending on the actual response structure
-  } catch (err) {
-    console.error("Failed to fetch /users/me in layout:", err);
-    // If not authenticated, let them view public pages but they can't access UserNav
-    // We can also redirect to login if we want the whole site to be private.
-    // The requirement says "public page, not admin specific", meaning unauthenticated users should probably see the browse page.
-    // If they MUST be logged in, we redirect:
-    // redirect("/login");
+  } catch (err: any) {
+    if (err?.status !== 401 && err?.statusCode !== 401) {
+      console.error("Failed to fetch /users/me in layout:", err);
+    }
   }
 
   return (
@@ -32,7 +31,7 @@ export default async function MainLayout({
           </span>
         </Link>
 
-        <MainNav />
+        <MainNav isLoggedIn={Boolean(user)} />
 
         <div className="ml-auto flex items-center gap-3">
           {user ? (

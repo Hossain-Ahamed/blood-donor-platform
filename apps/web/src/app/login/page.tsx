@@ -15,6 +15,15 @@ import Image from "next/image";
 
 export default function LoginPage() {
   const handleGoogleLogin = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const redirectTarget = params.get("redirect");
+      if (redirectTarget && redirectTarget.startsWith("/")) {
+        document.cookie = `post_login_redirect=${encodeURIComponent(redirectTarget)}; path=/; max-age=900; SameSite=Lax`;
+      }
+    } catch {
+      // ignore
+    }
     // Redirect to the backend Google OAuth flow
     const API_URL =
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/v1";

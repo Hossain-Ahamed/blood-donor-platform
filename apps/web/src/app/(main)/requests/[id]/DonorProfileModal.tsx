@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { ReportDialog } from "@/components/reports/ReportDialog";
 import { ReportTargetType } from "@repo/shared";
+import { FriendActionButton } from "@/components/friends/FriendActionButton";
 import type { RequesterDonorResponse } from "./RequesterResponsesCard";
 
 interface DonorProfileModalProps {
@@ -79,7 +80,7 @@ export function DonorProfileModal({
             )}
           </div>
           <DialogDescription className="text-xs">
-            Review full donor credentials and contact information before confirming.
+            Review full donor profile and contact information before confirming.
           </DialogDescription>
         </DialogHeader>
 
@@ -260,11 +261,21 @@ export function DonorProfileModal({
             </>
           )}
 
+          {response.status === "ACCEPTED" && response.donor_id && (
+            <FriendActionButton
+              targetUserId={response.donor_id}
+              size="default"
+            />
+          )}
+
           {response.status === "ACCEPTED" && donor?.phone && (
             <a href={`tel:${donor.phone}`} className="w-full sm:w-auto">
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                <Phone className="w-3.5 h-3.5 mr-1.5" />
-                Call Donor ({donor.phone})
+              <Button
+                variant="outline"
+                className="w-full border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 gap-1.5"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                Call {donor.phone}
               </Button>
             </a>
           )}

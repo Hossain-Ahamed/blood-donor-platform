@@ -162,6 +162,7 @@ export default async function RequestDetailPage({
               {user && isProfileComplete && hasPhone && (
                 <DonorResponseActionCard
                   requestId={id}
+                  requesterId={request.requester_id}
                   initialResponse={myResponse}
                   requestStatus={request.status}
                   requesterContactPhone={request.contact_phone}

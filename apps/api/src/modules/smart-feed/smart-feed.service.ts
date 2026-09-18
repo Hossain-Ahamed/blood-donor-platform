@@ -7,10 +7,12 @@ import { DonorProfile } from "../../entities/donor-profile.entity";
 import { BloodRequest } from "../../entities/request.entity";
 import { Response } from "../../entities/response.entity";
 import { Donation } from "../../entities/donation.entity";
+import { Friendship } from "../../entities/friendship.entity";
 import {
   RequestStatus,
   ResponseStatus,
   UrgencyLevel,
+  FriendshipStatus,
   SmartAlertItem,
   SmartFeedResponse,
   formatBloodGroup,
@@ -30,6 +32,8 @@ export class SmartFeedService {
     private readonly responseRepo: Repository<Response>,
     @InjectRepository(Donation)
     private readonly donationRepo: Repository<Donation>,
+    @InjectRepository(Friendship)
+    private readonly friendshipRepo: Repository<Friendship>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -240,6 +244,119 @@ export class SmartFeedService {
       }
     } catch (err) {
       this.logger.warn(`Failed to compute scheduled donations for user ${userId}: ${err}`);
+    }
+
+    // Step 5: Friendship Alerts
+    // 5a. Pending received friend requests
+    try {
+      const pendingFriendRequests = await this.friendshipRepo
+        .createQueryBuilder("f")
+        .innerJoinAndSelect("f.requester", "req")
+        .where("f.addressee_id = :userId AND f.status = :status", {
+          userId,
+          status: FriendshipStatus.PENDING,
+        })
+        .take(5)
+        .getMany();
+
+      for (const req of pendingFriendRequests) {
+        alerts.push({
+          id: `friend_req_${req.id}`,
+          type: "FRIEND_REQUEST",
+          urgency: "INFO",
+          title: "New Friend Request",
+          message: `${req.requester?.name || "A user"} sent you a friend request.`,
+          link: "/friends",
+          timestamp: req.created_at.toISOString(),
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to compute pending friend requests for user ${userId}: ${err}`,
+      );
+    }
+
+    // 5b. Accepted friend requests from last 48 hours
+    try {
+      const acceptedFriendships = await this.friendshipRepo
+        .createQueryBuilder("f")
+        .innerJoinAndSelect("f.addressee", "addr")
+        .where(
+          "f.requester_id = :userId AND f.status = :status AND f.updated_at >= :since",
+          {
+            userId,
+            status: FriendshipStatus.ACCEPTED,
+            since: twoDaysAgo,
+          },
+        )
+        .take(5)
+        .getMany();
+
+      for (const f of acceptedFriendships) {
+        alerts.push({
+          id: `friend_acc_${f.id}`,
+          type: "FRIEND_ACCEPTED",
+          urgency: "SUCCESS",
+          title: "Friend Request Accepted 🎉",
+          message: `You and ${f.addressee?.name || "a user"} are now friends.`,
+          link: `/friends/${f.addressee_id}`,
+          timestamp: f.updated_at.toISOString(),
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to compute accepted friendships for user ${userId}: ${err}`,
+      );
+    }
+
+    // 5c. Active blood requests created by friends (without location or blood group filtering)
+    try {
+      const friendRows = await this.friendshipRepo.find({
+        where: [
+          { requester_id: userId, status: FriendshipStatus.ACCEPTED },
+          { addressee_id: userId, status: FriendshipStatus.ACCEPTED },
+        ],
+      });
+
+      const friendUserIds = friendRows.map((f) =>
+        f.requester_id === userId ? f.addressee_id : f.requester_id,
+      );
+
+      if (friendUserIds.length > 0) {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+        const friendRequests = await this.requestRepo
+          .createQueryBuilder("r")
+          .innerJoinAndSelect("r.requester", "u")
+          .where("r.requester_id IN (:...friendUserIds)", { friendUserIds })
+          .andWhere("r.status = :status", { status: RequestStatus.OPEN })
+          .andWhere("r.created_at >= :since", { since: sevenDaysAgo })
+          .orderBy("r.created_at", "DESC")
+          .take(5)
+          .getMany();
+
+        for (const req of friendRequests) {
+          const exists = alerts.some(
+            (a) =>
+              a.id === `req_${req.id}` ||
+              a.id === `friend_req_blood_${req.id}`,
+          );
+          if (!exists) {
+            alerts.push({
+              id: `friend_req_blood_${req.id}`,
+              type: "FRIEND_BLOOD_REQUEST",
+              urgency: "CRITICAL",
+              title: `Friend in Need: ${req.requester?.name || "Friend"} needs ${formatBloodGroup(req.blood_group)} Blood!`,
+              message: `${req.area_name}${req.hospital_name ? " (" + req.hospital_name + ")" : ""} • ${req.units_needed} unit(s) needed`,
+              link: `/requests/${req.id}`,
+              timestamp: req.created_at.toISOString(),
+            });
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to compute friend blood requests for user ${userId}: ${err}`,
+      );
     }
 
     // Sort alerts: CRITICAL first, then by timestamp DESC

@@ -24,6 +24,7 @@ export default async function NewRequestPage() {
 
   let profile: ProfileWithUser | null = null;
   let user: User | null = null;
+  let shouldRedirectToLogin = false;
   try {
     const [profileRes, userRes] = await Promise.allSettled([
       apiServer.request<{ data: ProfileWithUser } | ProfileWithUser>(
@@ -31,6 +32,18 @@ export default async function NewRequestPage() {
       ),
       apiServer.request<{ data: User } | User>("/users/me"),
     ]);
+
+    if (
+      (profileRes.status === "rejected" &&
+        ((profileRes.reason as any)?.status === 401 ||
+          (profileRes.reason as any)?.statusCode === 401)) ||
+      (userRes.status === "rejected" &&
+        ((userRes.reason as any)?.status === 401 ||
+          (userRes.reason as any)?.statusCode === 401))
+    ) {
+      shouldRedirectToLogin = true;
+    }
+
     if (profileRes.status === "fulfilled" && profileRes.value) {
       const val = profileRes.value;
       profile =
@@ -42,6 +55,10 @@ export default async function NewRequestPage() {
     }
   } catch (error) {
     console.error("Error checking profile for new request page:", error);
+  }
+
+  if (shouldRedirectToLogin) {
+    redirect("/login?redirect=/requests/new");
   }
 
   const isProfileComplete = Boolean(profile && profile.blood_group);

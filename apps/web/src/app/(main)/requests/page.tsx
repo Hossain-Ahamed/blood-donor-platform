@@ -23,6 +23,7 @@ export default async function RequestCreatePage() {
   }
 
   let profile: ProfileWithUser | null = null;
+  let shouldRedirectToLogin = false;
   try {
     const profileRes = await apiServer.request<
       { data: ProfileWithUser } | ProfileWithUser
@@ -33,8 +34,16 @@ export default async function RequestCreatePage() {
           ? profileRes.data
           : (profileRes as ProfileWithUser);
     }
-  } catch (error) {
-    console.error("Error checking donor profile for request page:", error);
+  } catch (error: any) {
+    if (error?.status === 401 || error?.statusCode === 401) {
+      shouldRedirectToLogin = true;
+    } else {
+      console.error("Error checking donor profile for request page:", error);
+    }
+  }
+
+  if (shouldRedirectToLogin) {
+    redirect("/login?redirect=/requests");
   }
 
   const isProfileComplete = Boolean(profile && profile.blood_group);
