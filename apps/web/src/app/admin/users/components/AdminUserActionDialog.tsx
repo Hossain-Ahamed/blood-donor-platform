@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { User, UserRole } from "@repo/shared";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AdminUserActionDialogProps {
   dialogAction: "block" | "unblock" | "role" | null;
@@ -28,6 +29,10 @@ export function AdminUserActionDialog({
   onClose,
   onConfirm,
 }: AdminUserActionDialogProps) {
+  const { user: currentUser } = useAuth();
+  const isSelf = Boolean(currentUser && selectedUser && currentUser.id === selectedUser.id);
+  const isInvalidSelfAction = isSelf && (dialogAction === "block" || (dialogAction === "role" && newRole !== UserRole.ADMIN));
+
   return (
     <Dialog open={!!dialogAction} onOpenChange={(open: boolean) => !open && onClose()}>
       <DialogContent>
@@ -38,12 +43,20 @@ export function AdminUserActionDialog({
             {dialogAction === "role" && "Change User Role"}
           </DialogTitle>
           <DialogDescription>
-            {dialogAction === "block" &&
-              `Are you sure you want to block ${selectedUser?.name}? They will not be able to log in.`}
-            {dialogAction === "unblock" &&
-              `Are you sure you want to unblock ${selectedUser?.name}? They will regain access to the platform.`}
-            {dialogAction === "role" &&
-              `Are you sure you want to change ${selectedUser?.name}'s role to ${newRole}?`}
+            {isInvalidSelfAction ? (
+              <span className="text-red-600 dark:text-red-400 font-semibold block pt-1">
+                You cannot block your own administrator account or demote yourself.
+              </span>
+            ) : (
+              <>
+                {dialogAction === "block" &&
+                  `Are you sure you want to block ${selectedUser?.name}? They will not be able to log in.`}
+                {dialogAction === "unblock" &&
+                  `Are you sure you want to unblock ${selectedUser?.name}? They will regain access to the platform.`}
+                {dialogAction === "role" &&
+                  `Are you sure you want to change ${selectedUser?.name}'s role to ${newRole}?`}
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -53,7 +66,7 @@ export function AdminUserActionDialog({
           <Button
             variant={dialogAction === "block" ? "destructive" : "default"}
             onClick={onConfirm}
-            disabled={actionLoading}
+            disabled={actionLoading || isInvalidSelfAction}
           >
             {actionLoading ? "Updating..." : "Confirm"}
           </Button>

@@ -162,3 +162,108 @@ export const ReportSchema = z.object({
   reviewed_at: z.date().nullable().optional(),
 });
 export type Report = z.infer<typeof ReportSchema>;
+
+export const AuditLogSchema = z.object({
+  id: z.string().uuid(),
+  admin_id: z.string().uuid(),
+  action: z.string(),
+  target_type: z.string(),
+  target_id: z.string().uuid(),
+  meta: z.record(z.string(), z.any()).nullable().optional(),
+  created_at: z.date(),
+});
+export type AuditLog = z.infer<typeof AuditLogSchema>;
+
+export interface TargetSummary {
+  id: string;
+  type: ReportTargetType | string;
+  label: string;
+  details?: string | null;
+  status?: string | null;
+  extra?: Record<string, any> | null;
+}
+
+export interface EnrichedReport extends Report {
+  reporter?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar_url?: string | null;
+  } | null;
+  reviewer?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  target?: TargetSummary | null;
+}
+
+export interface EnrichedAuditLog extends AuditLog {
+  admin?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar_url?: string | null;
+    role: UserRole;
+  } | null;
+  target?: TargetSummary | null;
+}
+
+export function formatBloodGroup(bg?: string | null): string {
+  if (!bg) return "";
+  const trimmed = bg.trim();
+  const normalized = trimmed.toUpperCase();
+  const map: Record<string, string> = {
+    A_POS: "A+",
+    A_NEG: "A-",
+    B_POS: "B+",
+    B_NEG: "B-",
+    AB_POS: "AB+",
+    AB_NEG: "AB-",
+    O_POS: "O+",
+    O_NEG: "O-",
+    "A+": "A+",
+    "A-": "A-",
+    "B+": "B+",
+    "B-": "B-",
+    "AB+": "AB+",
+    "AB-": "AB-",
+    "O+": "O+",
+    "O-": "O-",
+  };
+  return map[normalized] || map[trimmed] || trimmed;
+}
+
+export function toHumanReadable(str?: string | null): string {
+  if (!str) return "";
+  let res = str
+    // 1. Replace blood groups like O_POS, o_pos, AB_NEG, a_neg to O+, AB-, A-, etc.
+    .replace(/\b(A|B|AB|O)_(POS|NEG)\b/gi, (_, group, sign) => {
+      return `${group.toUpperCase()}${sign.toUpperCase() === "POS" ? "+" : "-"}`;
+    })
+    // 2. Fix unit pluralization like "1 units" -> "1 unit"
+    .replace(/\b(\d+)\s+units\b/gi, (match, count) => {
+      return count === "1" ? "1 unit" : `${count} units`;
+    });
+
+  // 3. Format common system enums
+  const enumMap: Record<string, string> = {
+    WHOLE_BLOOD: "Whole Blood",
+    PLATELETS: "Platelets",
+    PLASMA: "Plasma",
+    CRYO: "Cryoprecipitate",
+    CRITICAL: "Critical",
+    URGENT: "Urgent",
+    NORMAL: "Normal",
+    PARTIALLY_FULFILLED: "Partially Fulfilled",
+    FULFILLED: "Fulfilled",
+    CANCELLED: "Cancelled",
+  };
+
+  for (const [key, val] of Object.entries(enumMap)) {
+    res = res.replace(new RegExp(`\\b${key}\\b`, "g"), val);
+  }
+
+  return res;
+}
+

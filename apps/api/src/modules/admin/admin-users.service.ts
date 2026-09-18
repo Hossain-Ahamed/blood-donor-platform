@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../entities/user.entity';
@@ -46,8 +46,6 @@ export class AdminUsersService {
   async findOne(id: string) {
     const user = await this.userRepository.findOne({
       where: { id },
-      // Assuming user entity doesn't have donor_profile relation defined explicitly in this project
-      // wait, I need to check how relations are defined in user.entity.ts
     });
 
     if (!user) throw new NotFoundException('User not found');
@@ -65,6 +63,13 @@ export class AdminUsersService {
   }
 
   async update(adminId: string, id: string, updateData: { is_active?: boolean; role?: string }) {
+    if (adminId === id && updateData.is_active === false) {
+      throw new BadRequestException("You cannot block or deactivate your own account.");
+    }
+    if (adminId === id && updateData.role && updateData.role !== 'ADMIN') {
+      throw new BadRequestException("You cannot revoke your own administrator role.");
+    }
+
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 

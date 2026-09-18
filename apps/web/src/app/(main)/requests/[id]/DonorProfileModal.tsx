@@ -22,7 +22,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Flag,
 } from "lucide-react";
+import { ReportDialog } from "@/components/reports/ReportDialog";
+import { ReportTargetType } from "@repo/shared";
 import type { RequesterDonorResponse } from "./RequesterResponsesCard";
 
 interface DonorProfileModalProps {
@@ -51,10 +54,30 @@ export function DonorProfileModal({
     <Dialog open={Boolean(response)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <User className="w-5 h-5 text-red-600" />
-            Donor Profile Details
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-2 pr-6">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <User className="w-5 h-5 text-red-600" />
+              Donor Profile Details
+            </DialogTitle>
+            {response.donor_id && (
+              <ReportDialog
+                targetType={ReportTargetType.USER}
+                targetId={response.donor_id}
+                targetTitle={`Donor: ${donor?.name || "Donor"}`}
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 px-2"
+                    title="Report donor for asking money or misconduct"
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                    <span>Report Donor</span>
+                  </Button>
+                }
+              />
+            )}
+          </div>
           <DialogDescription className="text-xs">
             Review full donor credentials and contact information before confirming.
           </DialogDescription>

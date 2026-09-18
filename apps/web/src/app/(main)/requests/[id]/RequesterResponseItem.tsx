@@ -16,7 +16,10 @@ import {
   Eye,
   Loader2,
   MessageSquare,
+  Flag,
 } from "lucide-react";
+import { ReportDialog } from "@/components/reports/ReportDialog";
+import { ReportTargetType } from "@repo/shared";
 import type { RequesterDonorResponse } from "./RequesterResponsesCard";
 
 interface RequesterResponseItemProps {
@@ -185,6 +188,25 @@ export function RequesterResponseItem({
                 {donor.phone}
               </Button>
             </a>
+          )}
+
+          {item.donor_id && (
+            <ReportDialog
+              targetType={ReportTargetType.USER}
+              targetId={item.donor_id}
+              targetTitle={`Donor: ${donor?.name || "Donor"}`}
+              trigger={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center gap-1 px-2"
+                  title="Report donor for asking money, misconduct, or false commitment"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Report</span>
+                </Button>
+              }
+            />
           )}
 
           {item.status === "OFFERED" && (

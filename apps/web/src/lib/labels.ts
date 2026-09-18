@@ -107,3 +107,62 @@ export function getLabel(
   if (!value) return "";
   return map[value] ?? formatDisplayValue(value);
 }
+
+export function formatBloodGroup(bg?: string | null): string {
+  if (!bg) return "";
+  const trimmed = bg.trim();
+  const normalized = trimmed.toUpperCase();
+  const map: Record<string, string> = {
+    A_POS: "A+",
+    A_NEG: "A-",
+    B_POS: "B+",
+    B_NEG: "B-",
+    AB_POS: "AB+",
+    AB_NEG: "AB-",
+    O_POS: "O+",
+    O_NEG: "O-",
+    "A+": "A+",
+    "A-": "A-",
+    "B+": "B+",
+    "B-": "B-",
+    "AB+": "AB+",
+    "AB-": "AB-",
+    "O+": "O+",
+    "O-": "O-",
+  };
+  return map[normalized] || map[trimmed] || trimmed;
+}
+
+export function toHumanReadable(str?: string | null): string {
+  if (!str) return "";
+  let res = str
+    // 1. Replace blood groups like O_POS, o_pos, AB_NEG, a_neg to O+, AB-, A-, etc.
+    .replace(/\b(A|B|AB|O)_(POS|NEG)\b/gi, (_, group, sign) => {
+      return `${group.toUpperCase()}${sign.toUpperCase() === "POS" ? "+" : "-"}`;
+    })
+    // 2. Fix unit pluralization like "1 units" -> "1 unit"
+    .replace(/\b(\d+)\s+units\b/gi, (match, count) => {
+      return count === "1" ? "1 unit" : `${count} units`;
+    });
+
+  // 3. Format common system enums
+  const enumMap: Record<string, string> = {
+    WHOLE_BLOOD: "Whole Blood",
+    PLATELETS: "Platelets",
+    PLASMA: "Plasma",
+    CRYO: "Cryoprecipitate",
+    CRITICAL: "Critical",
+    URGENT: "Urgent",
+    NORMAL: "Normal",
+    PARTIALLY_FULFILLED: "Partially Fulfilled",
+    FULFILLED: "Fulfilled",
+    CANCELLED: "Cancelled",
+  };
+
+  for (const [key, val] of Object.entries(enumMap)) {
+    res = res.replace(new RegExp(`\\b${key}\\b`, "g"), val);
+  }
+
+  return res;
+}
+

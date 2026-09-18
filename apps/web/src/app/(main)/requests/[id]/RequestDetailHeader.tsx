@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, ExternalLink } from "lucide-react";
+import { ShieldCheck, ExternalLink, Flag } from "lucide-react";
 import { bloodGroupLabels, getLabel } from "@/lib/labels";
-import type { BloodGroup, User } from "@repo/shared";
+import { BloodGroup, User, ReportTargetType } from "@repo/shared";
+import { ReportDialog } from "@/components/reports/ReportDialog";
 
 interface RequestDetailHeaderProps {
   id: string;
@@ -71,6 +72,23 @@ export function RequestDetailHeader({
             </Button>
           </Link>
         )}
+
+        <ReportDialog
+          targetType={ReportTargetType.REQUEST}
+          targetId={id}
+          targetTitle={`Need ${getLabel(bloodGroupLabels, bloodGroup)}`}
+          trigger={
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border/80 text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/10 flex items-center gap-1.5 font-medium text-xs h-9 shadow-xs"
+            >
+              <Flag className="w-3.5 h-3.5" />
+              <span>Report</span>
+            </Button>
+          }
+        />
+
 
         {urgency === "CRITICAL" ? (
           <Badge

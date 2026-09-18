@@ -5,9 +5,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Phone, Copy, Check, UserCheck, ShieldCheck, Mail, MapPin } from "lucide-react";
+import { Phone, Copy, Check, UserCheck, ShieldCheck, Mail, MapPin, Flag } from "lucide-react";
 import { toast } from "sonner";
-import type { User } from "@repo/shared";
+import { User, ReportTargetType } from "@repo/shared";
+import { ReportDialog } from "@/components/reports/ReportDialog";
 
 interface RequesterInfoCardProps {
   requester?: Partial<User> | null;
@@ -59,13 +60,32 @@ export function RequesterInfoCard({
             <UserCheck className="w-5 h-5 text-red-600 shrink-0" />
             Requester Details & Contact
           </CardTitle>
-          <Badge
-            variant="outline"
-            className="bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900 text-xs flex items-center gap-1 font-semibold"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-red-600" />
-            Verified Requester
-          </Badge>
+          <div className="flex items-center gap-2">
+            {requester?.id && (
+              <ReportDialog
+                targetType={ReportTargetType.USER}
+                targetId={requester.id}
+                targetTitle={`Requester: ${name}`}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground hover:text-destructive h-7 px-2 flex items-center gap-1"
+                  >
+                    <Flag className="w-3 h-3" />
+                    <span>Report</span>
+                  </Button>
+                }
+              />
+            )}
+            <Badge
+              variant="outline"
+              className="bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900 text-xs flex items-center gap-1 font-semibold"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-red-600" />
+              Verified Requester
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-5 space-y-4">
