@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { BadRequestException } from "@nestjs/common";
 import { RequestsService } from "./requests.service";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
@@ -130,6 +131,16 @@ describe("RequestsService", () => {
         },
       ]);
       expect(cacheManagerMock.set).toHaveBeenCalled();
+    });
+
+    it("should throw BadRequestException if lat or lng is missing or invalid", async () => {
+      await expect(
+        service.findNearby({ lat: NaN, lng: 20 } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.findNearby({ lat: 10, lng: undefined as any }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

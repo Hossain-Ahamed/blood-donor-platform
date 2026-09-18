@@ -180,22 +180,25 @@ export class RequestsService {
     });
   }
 
-  async findNearby(query: any) {
+  async findNearby(query: NearbyQueryDto) {
     this.logger.log(`findNearby called with: ${JSON.stringify(query)}`);
     const lat =
-      typeof query.lat === "number"
-        ? query.lat
-        : parseFloat(query.lat) || 23.7925;
+      typeof query.lat === "number" ? query.lat : parseFloat(query.lat as any);
     const lng =
-      typeof query.lng === "number"
-        ? query.lng
-        : parseFloat(query.lng) || 90.4078;
+      typeof query.lng === "number" ? query.lng : parseFloat(query.lng as any);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      throw new BadRequestException(
+        "Valid latitude and longitude coordinates are required",
+      );
+    }
+
     const rawRadius =
       typeof query.radiusKm === "number"
         ? query.radiusKm
-        : parseFloat(query.radiusKm) || 10;
+        : parseFloat(query.radiusKm as any) || 10;
     // Cap radius at 200 km
-    const radiusKm = Math.min(200, Math.max(1, rawRadius));
+    const radiusKm = Math.min(200, Math.max(0.1, rawRadius));
     const bloodGroup =
       query.bloodGroup &&
       query.bloodGroup !== "ALL" &&

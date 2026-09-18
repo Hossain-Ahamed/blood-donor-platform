@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
+import { useState, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { bloodGroupLabels, getLabel } from "@/lib/labels";
@@ -73,11 +73,10 @@ function AdminRequestsContent() {
     [searchParams, router, pathname],
   );
 
-  const [selectedRequest, setSelectedRequest] =
-    useState<RequestWithRequester | null>(null);
   const [searchIdInput, setSearchIdInput] = useState(requestIdParam);
-  const [handledRequestId, setHandledRequestId] = useState<string | null>(null);
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [explicitSelectedId, setExplicitSelectedId] = useState<string | null>(null);
+  const [isExplicitDialogOpen, setIsExplicitDialogOpen] = useState(false);
+  const [dismissedRequestId, setDismissedRequestId] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -113,28 +112,38 @@ function AdminRequestsContent() {
     updateParams,
   });
 
-  useEffect(() => {
-    if (!requestIdParam && handledRequestId !== null) {
-      setHandledRequestId(null);
-    } else if (
-      requestIdParam &&
-      handledRequestId !== requestIdParam &&
-      requests.length > 0
-    ) {
-      const match = requests.find(
-        (r) =>
-          r.id.toLowerCase() === requestIdParam.toLowerCase() ||
-          r.id.toLowerCase().startsWith(requestIdParam.toLowerCase()),
-      );
-      if (match) {
-        setHandledRequestId(requestIdParam);
-        setSelectedRequest(match);
-        setIsDetailDialogOpen(true);
-      } else if (!loading) {
-        setHandledRequestId(requestIdParam);
-      }
+  // Purely derived state - no useEffect needed with TanStack Query!
+  const selectedRequest = useMemo(() => {
+    if (explicitSelectedId) {
+      return requests.find((r) => r.id === explicitSelectedId) ?? null;
     }
-  }, [requestIdParam, handledRequestId, requests, loading]);
+    if (requestIdParam && dismissedRequestId !== requestIdParam) {
+      return (
+        requests.find(
+          (r) =>
+            r.id.toLowerCase() === requestIdParam.toLowerCase() ||
+            r.id.toLowerCase().startsWith(requestIdParam.toLowerCase()),
+        ) ?? null
+      );
+    }
+    return null;
+  }, [explicitSelectedId, requestIdParam, dismissedRequestId, requests]);
+
+  const isDetailDialogOpen = useMemo(() => {
+    if (isExplicitDialogOpen) return true;
+    if (requestIdParam && dismissedRequestId !== requestIdParam && selectedRequest) {
+      return true;
+    }
+    return false;
+  }, [isExplicitDialogOpen, requestIdParam, dismissedRequestId, selectedRequest]);
+
+  const handleCloseDetailDialog = useCallback(() => {
+    setIsExplicitDialogOpen(false);
+    setExplicitSelectedId(null);
+    if (requestIdParam) {
+      setDismissedRequestId(requestIdParam);
+    }
+  }, [requestIdParam]);
 
   const actionLoading = updateStatusMutation.isPending || deleteMutation.isPending;
 
@@ -208,8 +217,8 @@ function AdminRequestsContent() {
           page={page}
           totalPages={totalPages}
           onSelectRequest={(req) => {
-            setSelectedRequest(req);
-            setIsDetailDialogOpen(true);
+            setExplicitSelectedId(req.id);
+            setIsExplicitDialogOpen(true);
           }}
           onPageChange={(newPage) => updateParams({ page: newPage.toString() })}
         />
@@ -220,11 +229,8 @@ function AdminRequestsContent() {
           radiusKm={radiusKm}
           useRadiusFilter={useRadiusFilter}
           onMarkerClick={(id) => {
-            const req = requests.find((r) => r.id === id);
-            if (req) {
-              setSelectedRequest(req);
-              setIsDetailDialogOpen(true);
-            }
+            setExplicitSelectedId(id);
+            setIsExplicitDialogOpen(true);
           }}
           onMapClick={handleMapClick}
         />
@@ -234,7 +240,7 @@ function AdminRequestsContent() {
         isOpen={isDetailDialogOpen}
         request={selectedRequest}
         actionLoading={actionLoading}
-        onClose={() => setIsDetailDialogOpen(false)}
+        onClose={handleCloseDetailDialog}
         onOpenEdit={() => setIsEditDialogOpen(true)}
         onOpenDelete={() => setIsDeleteDialogOpen(true)}
         onUpdateStatus={(newStatus) => {
@@ -243,10 +249,7 @@ function AdminRequestsContent() {
             { id: selectedRequest.id, newStatus },
             {
               onSuccess: () => {
-                setSelectedRequest((prev) =>
-                  prev ? { ...prev, status: newStatus } : prev,
-                );
-                setIsDetailDialogOpen(false);
+                handleCloseDetailDialog();
               },
             },
           );
@@ -258,8 +261,7 @@ function AdminRequestsContent() {
         isOpen={isEditDialogOpen}
         isAdmin={true}
         onClose={() => setIsEditDialogOpen(false)}
-        onSuccess={(updated) => {
-          setSelectedRequest((prev) => (prev ? { ...prev, ...(updated || {}) } : null));
+        onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
         }}
       />
@@ -274,8 +276,10 @@ function AdminRequestsContent() {
           deleteMutation.mutate(selectedRequest.id, {
             onSuccess: () => {
               setIsDeleteDialogOpen(false);
-              setIsDetailDialogOpen(false);
-              setSelectedRequest(null);
+              handleCloseDetailDialog();
+              if (requestIdParam) {
+                updateParams({ requestId: null });
+              }
             },
           });
         }}

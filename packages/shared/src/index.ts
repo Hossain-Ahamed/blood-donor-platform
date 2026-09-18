@@ -267,3 +267,30 @@ export function toHumanReadable(str?: string | null): string {
   return res;
 }
 
+// 4. Ephemeral Smart Feed
+export type SmartAlertType =
+  | "NEARBY_REQUEST"
+  | "OFFER_ACCEPTED"
+  | "OFFER_RECEIVED"
+  | "DONATION_REMINDER";
+
+export type SmartAlertUrgency = "CRITICAL" | "SUCCESS" | "WARNING" | "INFO";
+
+export interface SmartAlertItem {
+  id: string;
+  type: SmartAlertType;
+  urgency: SmartAlertUrgency;
+  title: string;
+  message: string;
+  link: string;
+  timestamp: string;
+  is_read: boolean;
+  distance_km?: number;
+}
+
+export interface SmartFeedResponse {
+  alerts: SmartAlertItem[];
+  unreadCount: number;
+  hasProfileLocation: boolean;
+}
+

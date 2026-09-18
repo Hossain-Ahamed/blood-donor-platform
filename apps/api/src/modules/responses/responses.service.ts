@@ -14,8 +14,7 @@ import { User } from "../../entities/user.entity";
 import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
 import { DonorProfilesService, calculateAge } from "../donor-profiles/donor-profiles.service";
 import { ResponseStatus, RequestStatus } from "@repo/shared";
-import { NotificationsService } from "../notifications/notifications.service";
-import { NotificationType } from "../../entities/notification.entity";
+import { SmartFeedService } from "../smart-feed/smart-feed.service";
 
 @Injectable()
 export class ResponsesService {
@@ -31,7 +30,7 @@ export class ResponsesService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly pushSubscriptionsService: PushSubscriptionsService,
-    private readonly notificationsService: NotificationsService,
+    private readonly smartFeedService: SmartFeedService,
   ) {}
 
   async create(
@@ -122,6 +121,7 @@ export class ResponsesService {
     });
 
     const saved = await this.responseRepository.save(response);
+    this.smartFeedService.invalidateFeedCache(request.requester_id);
     this.notifyRequesterOfOffer(request, donorId);
     return saved;
   }
@@ -288,6 +288,7 @@ export class ResponsesService {
       status === ResponseStatus.ACCEPTED ||
       status === ResponseStatus.DECLINED
     ) {
+      this.smartFeedService.invalidateFeedCache(response.donor_id);
       this.notifyDonorOfStatusChange(response, status, rejectionReason);
     }
 
@@ -308,12 +309,10 @@ export class ResponsesService {
         const message = `${donorName}${bloodGroup} has volunteered to donate blood for your request (${request.area_name}).`;
         const link = `/requests/${request.id}`;
 
-        return this.notificationsService.create({
-          userId: request.requester_id,
+        return this.pushSubscriptionsService.notifyUsers([request.requester_id], {
           title,
-          message,
-          type: NotificationType.DONOR_APPLIED,
-          link,
+          body: message,
+          url: link,
         });
       })
       .catch((err) =>
@@ -337,15 +336,11 @@ export class ResponsesService {
         : "Your offer to donate was declined by the requester.";
     const link = `/requests/${response.request_id}`;
 
-    this.notificationsService
-      .create({
-        userId: response.donor_id,
+    this.pushSubscriptionsService
+      .notifyUsers([response.donor_id], {
         title,
-        message,
-        type: isAccepted
-          ? NotificationType.OFFER_ACCEPTED
-          : NotificationType.OFFER_DECLINED,
-        link,
+        body: message,
+        url: link,
       })
       .catch((err) =>
         console.error("Failed to notify donor of response status change:", err),

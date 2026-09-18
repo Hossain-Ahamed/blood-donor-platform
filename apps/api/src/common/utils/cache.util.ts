@@ -1,18 +1,39 @@
 import { Cache } from "cache-manager";
 import { Logger } from "@nestjs/common";
 
-const logger = new Logger("CacheStampedeProtection");
+const logger = new Logger("CacheProtectionUtil");
 const inFlightRequests = new Map<string, Promise<any>>();
 
+const SENTINEL_NULL_FLAG = "__SENTINEL_NULL__";
+
+export interface CacheOptions {
+  ttlMs?: number;
+  nullTtlMs?: number;
+  jitterPercent?: number;
+  forceRefresh?: boolean;
+  enablePenetrationProtection?: boolean;
+}
+
 /**
- * Executes a cache read with Cache Stampede protection (single-flight locking)
- * and optional cache-bypass for fresh data.
+ * Adds randomized jitter (default +/- 15%) to TTL to prevent Cache Avalanche / Stampede
+ * where bulk keys expire at the exact same millisecond.
+ */
+export function applyTtlJitter(ttlMs: number, jitterPercent = 0.15): number {
+  const min = ttlMs * (1 - jitterPercent);
+  const max = ttlMs * (1 + jitterPercent);
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+/**
+ * Advanced Cache-Aside fetcher with:
+ * 1. Cache Stampede Protection (Single-Flight In-Memory Promise Deduplication)
+ * 2. Cache Avalanche Protection (Jittered TTLs)
+ * 3. Cache Penetration Protection (Sentinel Null Caching with Short TTL)
  *
- * @param cacheManager NestJS cache manager instance
+ * @param cacheManager Cache manager instance
  * @param key Cache key
- * @param fetcher Database or heavy computation function
- * @param ttlMs Time-to-live in milliseconds (default: 60,000ms = 1 minute)
- * @param forceRefresh If true, bypasses the cache and repopulates it with fresh data
+ * @param fetcher Async function retrieving data from the database
+ * @param options Configuration options for TTL, jitter, and penetration safeguards
  */
 export async function getOrSetWithStampedeProtection<T>(
   cacheManager: Cache,
@@ -20,37 +41,88 @@ export async function getOrSetWithStampedeProtection<T>(
   fetcher: () => Promise<T>,
   ttlMs: number = 60000,
   forceRefresh: boolean = false,
+  options: Partial<CacheOptions> = {},
 ): Promise<T> {
-  // If not forcing fresh data, check cache first
-  if (!forceRefresh) {
+  const config: CacheOptions = {
+    ttlMs,
+    nullTtlMs: options.nullTtlMs ?? 30000, // 30 seconds for null/empty results
+    jitterPercent: options.jitterPercent ?? 0.15,
+    forceRefresh: forceRefresh || options.forceRefresh || false,
+    enablePenetrationProtection:
+      options.enablePenetrationProtection !== undefined
+        ? options.enablePenetrationProtection
+        : true,
+  };
+
+  // 1. Read from cache if not forcing refresh
+  if (!config.forceRefresh) {
     try {
-      const cached = await cacheManager.get<T>(key);
+      const cached = await cacheManager.get<any>(key);
       if (cached !== undefined && cached !== null) {
-        return cached;
+        // Cache Penetration Check: Sentinel object detected
+        if (
+          config.enablePenetrationProtection &&
+          cached &&
+          typeof cached === "object" &&
+          cached[SENTINEL_NULL_FLAG] === true
+        ) {
+          return null as unknown as T;
+        }
+        return cached as T;
       }
     } catch (err) {
       logger.warn(`Failed to read from cache for key "${key}": ${err}`);
     }
   }
 
-  // Stampede protection: if there is already an in-flight fetch for this key, join it
+  // 2. Cache Stampede Protection: Single-flight request deduplication
+  // If a request for this exact key is already in flight, await that promise
   if (inFlightRequests.has(key)) {
     try {
       return await inFlightRequests.get(key);
     } catch {
-      // In case the joined promise fails, continue below to execute fresh
+      // If the joined in-flight request fails, continue below to execute fresh
     }
   }
 
-  // Create new in-flight fetcher
+  // 3. Create single-flight promise to fetch from DB and populate cache
   const promise = (async () => {
     try {
       const result = await fetcher();
+
+      // Check for empty/null result -> apply Cache Penetration Sentinel
+      if (result === null || result === undefined) {
+        if (config.enablePenetrationProtection) {
+          const sentinelTtl = applyTtlJitter(
+            config.nullTtlMs!,
+            config.jitterPercent,
+          );
+          try {
+            await cacheManager.set(
+              key,
+              { [SENTINEL_NULL_FLAG]: true },
+              sentinelTtl,
+            );
+          } catch (cacheErr) {
+            logger.warn(
+              `Failed to set null sentinel cache for key "${key}": ${cacheErr}`,
+            );
+          }
+        }
+        return null as unknown as T;
+      }
+
+      // Normal valid data: store with jittered TTL to avoid stampede avalanche
+      const effectiveTtl = applyTtlJitter(
+        config.ttlMs!,
+        config.jitterPercent,
+      );
       try {
-        await cacheManager.set(key, result, ttlMs);
+        await cacheManager.set(key, result, effectiveTtl);
       } catch (cacheErr) {
         logger.warn(`Failed to set cache for key "${key}": ${cacheErr}`);
       }
+
       return result;
     } finally {
       inFlightRequests.delete(key);
@@ -62,7 +134,7 @@ export async function getOrSetWithStampedeProtection<T>(
 }
 
 /**
- * Safely invalidates one or more keys or key prefixes from the cache.
+ * Safely invalidates one or more keys from the cache.
  */
 export async function invalidateCacheKeys(
   cacheManager: Cache,

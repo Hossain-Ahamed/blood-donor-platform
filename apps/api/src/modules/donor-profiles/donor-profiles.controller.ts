@@ -3,6 +3,7 @@ import { DonorProfilesService } from "./donor-profiles.service";
 import {
   UpsertDonorProfileDto,
   UpdateDonorProfileDto,
+  NearbyDonorsQueryDto,
 } from "./dto/donor-profile.dto";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 
@@ -26,10 +27,10 @@ export class DonorProfilesController {
   }
 
   @Get("nearby")
-  async findNearby(@Query() query: any) {
-    const lat = parseFloat(query.lat);
-    const lng = parseFloat(query.lng);
-    const radiusKm = parseFloat(query.radiusKm);
+  async findNearby(@Query() query: NearbyDonorsQueryDto) {
+    const lat = query.lat;
+    const lng = query.lng;
+    const radiusKm = query.radiusKm ?? 10;
     const profiles = await this.donorProfilesService.findNearby(
       lat,
       lng,
