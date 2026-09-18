@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useTransition } from "react";
+import React, { useEffect, useState, useTransition } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { EnrichedAuditLog } from "@repo/shared";
 import { toHumanReadable } from "@/lib/labels";
@@ -74,11 +75,7 @@ interface PaginatedAuditResponse {
 }
 
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState<EnrichedAuditLog[]>([]);
-  const [stats, setStats] = useState<AuditStats | null>(null);
-  const [adminsList, setAdminsList] = useState<AdminUserOption[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [statsLoading, setStatsLoading] = useState<boolean>(false);
+  const queryClient = useQueryClient();
   const [, startTransition] = useTransition();
 
   // Filters
@@ -93,8 +90,6 @@ export default function AdminAuditLogsPage() {
   // Pagination
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(15);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
 
   // Changeset / Meta Inspector Modal
   const [selectedLog, setSelectedLog] = useState<EnrichedAuditLog | null>(null);
@@ -110,81 +105,78 @@ export default function AdminAuditLogsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch Stats (1-min Redis cached with fresh option)
-  const fetchStats = useCallback(async (isFresh = false) => {
-    setStatsLoading(true);
-    try {
-      const url = isFresh ? "/admin/audit-logs/stats?fresh=true" : "/admin/audit-logs/stats";
-      const res = await apiClient.request<AuditStats>(url);
+  // TanStack Query: Stats
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ["admin-audit-logs-stats"],
+    queryFn: async () => {
+      const res = await apiClient.request<AuditStats>("/admin/audit-logs/stats");
       const data = (res as any).data || res;
-      setStats(data);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load audit statistics");
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
+      return data as AuditStats;
+    },
+  });
+  const stats = statsData ?? null;
 
-  // Fetch Admins list for dropdown
-  const fetchAdmins = useCallback(async () => {
-    try {
+  // TanStack Query: Admins list
+  const { data: adminsList = [] } = useQuery({
+    queryKey: ["admin-audit-logs-admins"],
+    queryFn: async () => {
       const res = await apiClient.request<AdminUserOption[]>("/admin/audit-logs/admins");
       const data = (res as any).data || res;
-      setAdminsList(Array.isArray(data) ? data : []);
-    } catch {
-      // Non-critical if fails
-    }
-  }, []);
-
-  // Fetch Paginated Logs (1-min Redis cached with fresh option)
-  const fetchLogs = useCallback(
-    async (isFresh = false) => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-        });
-        if (adminFilter !== "all") params.append("admin_id", adminFilter);
-        if (actionFilter !== "all") params.append("action", actionFilter);
-        if (targetTypeFilter !== "all") params.append("target_type", targetTypeFilter);
-        if (startDate) params.append("start_date", startDate);
-        if (endDate) params.append("end_date", endDate);
-        if (debouncedSearch) params.append("search", debouncedSearch);
-        if (isFresh) params.append("fresh", "true");
-
-        const res = await apiClient.request<PaginatedAuditResponse>(
-          `/admin/audit-logs?${params.toString()}`,
-        );
-        const json = (res as any).data?.data ? (res as any).data : res;
-
-        setLogs(json.data || []);
-        setTotalPages(json.meta?.totalPages || 1);
-        setTotalCount(json.meta?.total || 0);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to load audit logs");
-      } finally {
-        setLoading(false);
-      }
+      return (Array.isArray(data) ? data : []) as AdminUserOption[];
     },
-    [page, limit, adminFilter, actionFilter, targetTypeFilter, startDate, endDate, debouncedSearch],
-  );
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    fetchStats();
-    fetchAdmins();
-  }, [fetchStats, fetchAdmins]);
+  // TanStack Query: Paginated Logs
+  const { data: logsResponse, isLoading: loading } = useQuery({
+    queryKey: [
+      "admin-audit-logs",
+      {
+        page,
+        limit,
+        adminFilter,
+        actionFilter,
+        targetTypeFilter,
+        startDate,
+        endDate,
+        debouncedSearch,
+      },
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      if (adminFilter !== "all") params.append("admin_id", adminFilter);
+      if (actionFilter !== "all") params.append("action", actionFilter);
+      if (targetTypeFilter !== "all") params.append("target_type", targetTypeFilter);
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+      if (debouncedSearch) params.append("search", debouncedSearch);
 
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+      const res = await apiClient.request<PaginatedAuditResponse>(
+        `/admin/audit-logs?${params.toString()}`,
+      );
+      const json = (res as any).data?.data ? (res as any).data : res;
+
+      return {
+        logs: (json.data || []) as EnrichedAuditLog[],
+        totalPages: (json.meta?.totalPages || 1) as number,
+        totalCount: (json.meta?.total || 0) as number,
+      };
+    },
+  });
+
+  const logs = logsResponse?.logs ?? [];
+  const totalPages = logsResponse?.totalPages ?? 1;
+  const totalCount = logsResponse?.totalCount ?? 0;
 
   // Handle fresh DB reload
   const handleReloadFresh = () => {
     startTransition(() => {
-      fetchStats(true);
-      fetchLogs(true);
-      toast.info("Loading fresh audit logs directly from database...");
+      toast.info("Reloading audit logs directly from database...");
+      queryClient.invalidateQueries({ queryKey: ["admin-audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-audit-logs-stats"] });
     });
   };
 

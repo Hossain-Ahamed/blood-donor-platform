@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -37,26 +37,18 @@ interface DashboardStats {
 }
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await apiClient.request<{ data: DashboardStats }>(
-          "/admin/dashboard/stats",
-        );
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setStats(data as any); // Might need adjusting based on NestJS interceptor
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load stats");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
+  const {
+    data: stats,
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ["admin-dashboard-stats"],
+    queryFn: async () => {
+      return apiClient.request<{ data: DashboardStats }>(
+        "/admin/dashboard/stats",
+      );
+    },
+  });
 
   if (loading) {
     return (
@@ -69,10 +61,12 @@ export default function AdminDashboardPage() {
   }
 
   if (error || !stats) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to load stats";
     return (
       <div className="p-6">
         <div className="bg-red-50 text-red-500 p-4 rounded-md">
-          Error: {error}
+          Error: {errorMessage}
         </div>
       </div>
     );

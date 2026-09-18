@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useTransition } from "react";
+import React, { useEffect, useState, useTransition } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { apiClient } from "@/lib/api/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -79,11 +80,8 @@ interface PaginatedReportsResponse {
 }
 
 export default function AdminReportsPage() {
+  const queryClient = useQueryClient();
   const { user: currentAdmin } = useAuth();
-  const [reports, setReports] = useState<EnrichedReport[]>([]);
-  const [stats, setStats] = useState<ReportStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(false);
   const [, startTransition] = useTransition();
 
   // Filters
@@ -93,15 +91,12 @@ export default function AdminReportsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(10);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
 
   // Review Modal State
   const [selectedReport, setSelectedReport] = useState<EnrichedReport | null>(null);
   const [reviewStatus, setReviewStatus] = useState<ReportStatus>(ReportStatus.ACTIONED);
   const [adminNote, setAdminNote] = useState<string>("");
   const [executeTargetAction, setExecuteTargetAction] = useState<boolean>(true);
-  const [submittingAction, setSubmittingAction] = useState<boolean>(false);
 
   // Detail Inspector Modal
   const [inspectingReport, setInspectingReport] = useState<EnrichedReport | null>(null);
@@ -115,66 +110,55 @@ export default function AdminReportsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch Stats (1-min Redis cached with fresh option)
-  const fetchStats = useCallback(async (isFresh = false) => {
-    setStatsLoading(true);
-    try {
-      const url = isFresh ? "/reports/stats?fresh=true" : "/reports/stats";
-      const res = await apiClient.request<ReportStats>(url);
+  // TanStack Query: Stats
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ["admin-reports-stats"],
+    queryFn: async () => {
+      const res = await apiClient.request<ReportStats>("/reports/stats");
       const data = (res as any).data || res;
-      setStats(data);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load report statistics");
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  // Fetch Reports (1-min Redis cached with fresh option)
-  const fetchReports = useCallback(
-    async (isFresh = false) => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-        });
-        if (statusFilter !== "all") params.append("status", statusFilter);
-        if (targetTypeFilter !== "all") params.append("target_type", targetTypeFilter);
-        if (debouncedSearch) params.append("search", debouncedSearch);
-        if (isFresh) params.append("fresh", "true");
-
-        const res = await apiClient.request<PaginatedReportsResponse>(
-          `/reports?${params.toString()}`,
-        );
-        const json = (res as any).data?.data ? (res as any).data : res;
-
-        setReports(json.data || []);
-        setTotalPages(json.meta?.totalPages || 1);
-        setTotalCount(json.meta?.total || 0);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to load reports");
-      } finally {
-        setLoading(false);
-      }
+      return data as ReportStats;
     },
-    [page, limit, statusFilter, targetTypeFilter, debouncedSearch],
-  );
+  });
+  const stats = statsData ?? null;
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  // TanStack Query: Paginated Reports
+  const { data: reportsResponse, isLoading: loading } = useQuery({
+    queryKey: [
+      "admin-reports",
+      { page, limit, statusFilter, targetTypeFilter, debouncedSearch },
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (targetTypeFilter !== "all") params.append("target_type", targetTypeFilter);
+      if (debouncedSearch) params.append("search", debouncedSearch);
 
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
+      const res = await apiClient.request<PaginatedReportsResponse>(
+        `/reports?${params.toString()}`,
+      );
+      const json = (res as any).data?.data ? (res as any).data : res;
 
-  // Handle Refreshing with fresh DB bypass
+      return {
+        reports: (json.data || []) as EnrichedReport[],
+        totalPages: (json.meta?.totalPages || 1) as number,
+        totalCount: (json.meta?.total || 0) as number,
+      };
+    },
+  });
+
+  const reports = reportsResponse?.reports ?? [];
+  const totalPages = reportsResponse?.totalPages ?? 1;
+  const totalCount = reportsResponse?.totalCount ?? 0;
+
+  // Handle Refreshing with cache invalidation
   const handleReloadFresh = () => {
     startTransition(() => {
-      fetchStats(true);
-      fetchReports(true);
-      toast.info("Loading fresh reports data directly from database...");
+      toast.info("Reloading reports data directly from database...");
+      queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-reports-stats"] });
     });
   };
 
@@ -189,12 +173,10 @@ export default function AdminReportsPage() {
     setExecuteTargetAction(!isSelfTarget);
   };
 
-  // Submit Review / Action
-  const handleSubmitReview = async () => {
-    if (!selectedReport) return;
-    setSubmittingAction(true);
-
-    try {
+  // Mutation: Submit Review / Action
+  const reviewMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedReport) return;
       let action_target: "BLOCK_USER" | "CANCEL_REQUEST" | "NONE" = "NONE";
       if (executeTargetAction && reviewStatus === ReportStatus.ACTIONED) {
         if (selectedReport.target_type === ReportTargetType.USER) {
@@ -204,7 +186,7 @@ export default function AdminReportsPage() {
         }
       }
 
-      await apiClient.request(`/reports/${selectedReport.id}`, {
+      return apiClient.request(`/reports/${selectedReport.id}`, {
         method: "PATCH",
         body: JSON.stringify({
           status: reviewStatus,
@@ -212,23 +194,25 @@ export default function AdminReportsPage() {
           action_target,
         }),
       });
-
+    },
+    onSuccess: () => {
+      const isTargetAction = executeTargetAction && reviewStatus === ReportStatus.ACTIONED && selectedReport;
       toast.success(
-        action_target !== "NONE"
-          ? `Report actioned and target ${selectedReport.target_type.toLowerCase()} updated.`
+        isTargetAction
+          ? `Report actioned and target ${selectedReport!.target_type.toLowerCase()} updated.`
           : "Report status updated successfully.",
       );
-
       setSelectedReport(null);
-      // Reload fresh data to immediately reflect changes
-      fetchStats(true);
-      fetchReports(true);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to submit review");
-    } finally {
-      setSubmittingAction(false);
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-reports-stats"] });
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "Failed to submit review");
+    },
+  });
+
+  const handleSubmitReview = () => reviewMutation.mutate();
+  const submittingAction = reviewMutation.isPending;
 
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">

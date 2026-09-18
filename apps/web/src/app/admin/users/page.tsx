@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { User, UserRole } from "@repo/shared";
 import { toast } from "sonner";
@@ -19,8 +20,7 @@ interface PaginatedResponse<T> {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // Filters
   const [search, setSearch] = useState("");
@@ -28,7 +28,6 @@ export default function AdminUsersPage() {
   const [isActive, setIsActive] = useState<string>("all");
   const [role, setRole] = useState<string>("all");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   // Dialog state
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -36,9 +35,8 @@ export default function AdminUsersPage() {
     "block" | "unblock" | "role" | null
   >(null);
   const [newRole, setNewRole] = useState<UserRole | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
-  // Debounce search
+  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -47,9 +45,10 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
+  // TanStack Query for users list
+  const { data: usersData, isLoading: loading } = useQuery({
+    queryKey: ["admin-users", { page, debouncedSearch, isActive, role }],
+    queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: "10",
@@ -67,47 +66,42 @@ export default function AdminUsersPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ? (response as any).data
         : response;
-      setUsers(data.data as User[]);
-      setTotalPages(data.meta.totalPages as number);
-    } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to fetch users",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, isActive, role, page]);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+      return {
+        users: (data.data || []) as User[],
+        totalPages: (data.meta?.totalPages ?? 1) as number,
+      };
+    },
+  });
 
-  const handleAction = async () => {
-    if (!selectedUser || !dialogAction) return;
+  const users = usersData?.users ?? [];
+  const totalPages = usersData?.totalPages ?? 1;
 
-    setActionLoading(true);
-    try {
+  // Mutation for user actions (block / unblock / role change)
+  const actionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedUser || !dialogAction) return;
       let updateData = {};
       if (dialogAction === "block") updateData = { is_active: false };
       if (dialogAction === "unblock") updateData = { is_active: true };
       if (dialogAction === "role" && newRole) updateData = { role: newRole };
 
-      await apiClient.request(`/admin/users/${selectedUser.id}`, {
+      return apiClient.request(`/admin/users/${selectedUser.id}`, {
         method: "PATCH",
         body: JSON.stringify(updateData),
       });
-
+    },
+    onSuccess: () => {
       toast.success("User updated successfully");
-      fetchUsers();
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       closeDialog();
-    } catch (error: unknown) {
+    },
+    onError: (error: unknown) => {
       toast.error(
         error instanceof Error ? error.message : "Failed to update user",
       );
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+  });
 
   const closeDialog = () => {
     setSelectedUser(null);
@@ -160,9 +154,9 @@ export default function AdminUsersPage() {
         dialogAction={dialogAction}
         selectedUser={selectedUser}
         newRole={newRole}
-        actionLoading={actionLoading}
+        actionLoading={actionMutation.isPending}
         onClose={closeDialog}
-        onConfirm={handleAction}
+        onConfirm={() => actionMutation.mutate()}
       />
     </div>
   );
