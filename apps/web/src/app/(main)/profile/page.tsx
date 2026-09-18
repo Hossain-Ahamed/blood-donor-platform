@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { apiServer } from "@/lib/api/server";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { Badge } from "@/components/ui/badge";
 import type { DonorProfile, User } from "@repo/shared";
 import { ProfileForm } from "./ProfileForm";
@@ -60,7 +59,6 @@ export default async function ProfilePage() {
               Status: {isAvailable ? "Available" : "Unavailable"}
             </Badge>
           )}
-          <LanguageSwitcher />
         </div>
       </div>
 
@@ -70,3 +68,5 @@ export default async function ProfilePage() {
     </div>
   );
 }
+
+

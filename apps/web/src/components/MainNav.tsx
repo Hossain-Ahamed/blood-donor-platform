@@ -30,8 +30,7 @@ export function MainNav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         href={isLoggedIn ? "/requests" : "/login?redirect=/requests"}
       >
         <span className="text-sm font-bold leading-none">+</span>
-        <span>Request</span>
-        <span className="hidden sm:inline">Blood</span>
+        <span>Request Blood</span>
       </Link>
       {isLoggedIn && (
         <>
@@ -62,3 +61,5 @@ export function MainNav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
     </nav>
   );
 }
+
+

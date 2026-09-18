@@ -30,6 +30,7 @@ import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import {
   getOrSetWithStampedeProtection,
   invalidateCacheKeys,
+  invalidateCachePattern,
 } from "../../common/utils/cache.util";
 
 @Injectable()
@@ -100,6 +101,7 @@ export class ReportsService {
       "reports:stats",
       "admin:dashboard:stats",
     ]);
+    await invalidateCachePattern(this.cacheManager, "reports:*");
 
     return saved;
   }
@@ -325,6 +327,7 @@ export class ReportsService {
       "admin:dashboard:stats",
       `cache:target:${report.target_type}:${report.target_id}`,
     ]);
+    await invalidateCachePattern(this.cacheManager, "reports:*");
 
     return savedReport;
   }

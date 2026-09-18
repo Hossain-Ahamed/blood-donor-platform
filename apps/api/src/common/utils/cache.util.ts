@@ -148,3 +148,30 @@ export async function invalidateCacheKeys(
     }
   }
 }
+
+/**
+ * Safely invalidates cache keys matching a pattern (e.g. "reports:*").
+ * Supports Redis store, memory store, or fallback without throwing.
+ */
+export async function invalidateCachePattern(
+  cacheManager: Cache,
+  pattern: string,
+): Promise<void> {
+  try {
+    const store = (cacheManager as any)?.store;
+    if (store && typeof store.keys === "function") {
+      const keys = await store.keys(pattern);
+      if (Array.isArray(keys) && keys.length > 0) {
+        await Promise.all(keys.map((k: string) => cacheManager.del(k).catch(() => {})));
+      }
+    } else if (store?.client && typeof store.client.keys === "function") {
+      const keys = await store.client.keys(pattern);
+      if (Array.isArray(keys) && keys.length > 0) {
+        await Promise.all(keys.map((k: string) => cacheManager.del(k).catch(() => {})));
+      }
+    }
+  } catch (err) {
+    logger.warn(`Failed to invalidate cache pattern "${pattern}": ${err}`);
+  }
+}
+

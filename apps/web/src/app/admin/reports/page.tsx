@@ -111,10 +111,11 @@ export default function AdminReportsPage() {
   }, [search]);
 
   // TanStack Query: Stats
+  // TanStack Query: Stats
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ["admin-reports-stats"],
     queryFn: async () => {
-      const res = await apiClient.request<ReportStats>("/reports/stats");
+      const res = await apiClient.request<ReportStats>("/reports/stats?fresh=true");
       const data = (res as any).data || res;
       return data as ReportStats;
     },
@@ -131,6 +132,7 @@ export default function AdminReportsPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
+        fresh: "true",
       });
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (targetTypeFilter !== "all") params.append("target_type", targetTypeFilter);
@@ -202,6 +204,58 @@ export default function AdminReportsPage() {
           ? `Report actioned and target ${selectedReport!.target_type.toLowerCase()} updated.`
           : "Report status updated successfully.",
       );
+
+      // Immediately update the report status and reviewer in TanStack Query's cache
+      if (selectedReport) {
+        const reportId = selectedReport.id;
+        const newStatus = reviewStatus;
+        const note = adminNote.trim();
+        const willBlock =
+          executeTargetAction &&
+          newStatus === ReportStatus.ACTIONED &&
+          selectedReport.target_type === ReportTargetType.USER;
+        const willCancel =
+          executeTargetAction &&
+          newStatus === ReportStatus.ACTIONED &&
+          selectedReport.target_type === ReportTargetType.REQUEST;
+
+        queryClient.setQueriesData(
+          { queryKey: ["admin-reports"] },
+          (old: any) => {
+            if (!old || !Array.isArray(old.reports)) return old;
+            return {
+              ...old,
+              reports: old.reports.map((r: EnrichedReport) => {
+                if (r.id !== reportId) return r;
+                return {
+                  ...r,
+                  status: newStatus,
+                  admin_note: note || r.admin_note,
+                  reviewer: currentAdmin
+                    ? {
+                        id: currentAdmin.id,
+                        name: currentAdmin.name,
+                        email: currentAdmin.email,
+                      }
+                    : r.reviewer,
+                  reviewed_at: new Date().toISOString(),
+                  target: r.target
+                    ? {
+                        ...r.target,
+                        status: willBlock
+                          ? "INACTIVE"
+                          : willCancel
+                            ? "CANCELLED"
+                            : r.target.status,
+                      }
+                    : undefined,
+                };
+              }),
+            };
+          },
+        );
+      }
+
       setSelectedReport(null);
       queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
       queryClient.invalidateQueries({ queryKey: ["admin-reports-stats"] });
