@@ -230,7 +230,6 @@ export default function AdminReportsPage() {
                 return {
                   ...r,
                   status: newStatus,
-                  admin_note: note || r.admin_note,
                   reviewer: currentAdmin
                     ? {
                         id: currentAdmin.id,
@@ -238,7 +237,7 @@ export default function AdminReportsPage() {
                         email: currentAdmin.email,
                       }
                     : r.reviewer,
-                  reviewed_at: new Date().toISOString(),
+                  reviewed_at: new Date() as any,
                   target: r.target
                     ? {
                         ...r.target,
