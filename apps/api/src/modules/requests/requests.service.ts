@@ -26,6 +26,7 @@ import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptio
 import { DonorProfilesService } from "../donor-profiles/donor-profiles.service";
 import { FriendsService } from "../friends/friends.service";
 import { SmartFeedService } from "../smart-feed/smart-feed.service";
+import { invalidateCacheKeys } from "../../common/utils/cache.util";
 
 @Injectable()
 export class RequestsService {
@@ -92,6 +93,7 @@ export class RequestsService {
     });
 
     const savedRequest = await this.requestRepository.save(request);
+    await invalidateCacheKeys(this.cacheManager, [`profile:user:${userId}`]);
 
     // If the requester doesn't have a phone number set, persist the contact phone
     if (dto.contact_phone) {
@@ -413,6 +415,9 @@ export class RequestsService {
     }
 
     const saved = await this.requestRepository.save(request);
+    await invalidateCacheKeys(this.cacheManager, [
+      `profile:user:${request.requester_id}`,
+    ]);
 
     try {
       if (
@@ -445,6 +450,9 @@ export class RequestsService {
     }
 
     await this.requestRepository.softDelete(id);
+    await invalidateCacheKeys(this.cacheManager, [
+      `profile:user:${request.requester_id}`,
+    ]);
 
     try {
       if (

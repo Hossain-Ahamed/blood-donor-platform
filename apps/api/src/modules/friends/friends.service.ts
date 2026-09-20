@@ -639,16 +639,117 @@ export class FriendsService {
   /**
    * Returns a user's full profile, donation history, and blood requests.
    * If friends, contact phone and detailed history are visible.
+   * Caches the heavy underlying profile bundle in Redis for 5 minutes with stampede protection.
    */
   async getFriendProfile(
     userId: string,
     targetUserId: string,
   ): Promise<FriendProfileDetail> {
-    const targetUser = await this.userRepo.findOne({
-      where: { id: targetUserId, is_active: true },
-    });
+    const cacheKey = `profile:user:${targetUserId}`;
 
-    if (!targetUser) {
+    interface CachedUserProfileBundle {
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        avatar_url?: string | null;
+        phone?: string | null;
+        created_at: Date | string;
+      };
+      profile: {
+        blood_group: any;
+        area_name?: string | null;
+        is_available: boolean;
+        bio?: string | null;
+        age?: number | null;
+        date_of_birth?: Date | string | null;
+        religion?: string | null;
+        health_notes?: string | null;
+        last_donation_date?: Date | string | null;
+      } | null;
+      donations: FriendProfileDetail["donations"];
+      requests: FriendProfileDetail["requests"];
+    }
+
+    const bundle = await getOrSetWithStampedeProtection<CachedUserProfileBundle | null>(
+      this.cacheManager,
+      cacheKey,
+      async () => {
+        const targetUser = await this.userRepo.findOne({
+          where: { id: targetUserId, is_active: true },
+        });
+
+        if (!targetUser) {
+          return null;
+        }
+
+        const profile = await this.donorProfileRepo.findOne({
+          where: { user_id: targetUserId },
+        });
+
+        // Fetch user's completed donation history
+        const donations = await this.donationRepo
+          .createQueryBuilder("don")
+          .innerJoinAndSelect("don.response", "resp")
+          .innerJoinAndSelect("resp.request", "req")
+          .where("resp.donor_id = :targetUserId", { targetUserId })
+          .orderBy("don.donation_date", "DESC")
+          .take(20)
+          .getMany();
+
+        // Fetch user's blood requests
+        const requests = await this.requestRepo.find({
+          where: { requester_id: targetUserId },
+          order: { created_at: "DESC" },
+          take: 20,
+        });
+
+        return {
+          user: {
+            id: targetUser.id,
+            name: targetUser.name,
+            email: targetUser.email,
+            avatar_url: targetUser.avatar_url,
+            phone: targetUser.phone,
+            created_at: targetUser.created_at,
+          },
+          profile: profile
+            ? {
+                blood_group: profile.blood_group,
+                area_name: profile.area_name,
+                is_available: profile.is_available,
+                bio: profile.bio,
+                age: profile.age,
+                date_of_birth: profile.date_of_birth,
+                religion: profile.religion,
+                health_notes: profile.health_notes,
+                last_donation_date: profile.last_donation_date,
+              }
+            : null,
+          donations: donations.map((d) => ({
+            id: d.id,
+            donation_date: d.donation_date,
+            area_name: d.response?.request?.area_name,
+            hospital_name: d.response?.request?.hospital_name,
+            blood_group: d.response?.request?.blood_group,
+          })),
+          requests: requests.map((r) => ({
+            id: r.id,
+            blood_group: r.blood_group,
+            urgency: r.urgency,
+            units_needed: r.units_needed,
+            units_fulfilled: r.units_fulfilled,
+            status: r.status,
+            area_name: r.area_name || "",
+            hospital_name: r.hospital_name,
+            created_at: r.created_at,
+          })),
+        };
+      },
+      300000, // 5 minutes TTL
+    );
+
+    if (!bundle) {
       throw new NotFoundException("User not found");
     }
 
@@ -656,70 +757,40 @@ export class FriendsService {
     const status = await this.getStatus(userId, targetUserId);
     const isFriends = isSelf || status.relationship === "FRIENDS";
 
-    const profile = await this.donorProfileRepo.findOne({
-      where: { user_id: targetUserId },
-    });
-
-    // Fetch user's completed donation history
-    const donations = await this.donationRepo
-      .createQueryBuilder("don")
-      .innerJoinAndSelect("don.response", "resp")
-      .innerJoinAndSelect("resp.request", "req")
-      .where("resp.donor_id = :targetUserId", { targetUserId })
-      .orderBy("don.donation_date", "DESC")
-      .take(20)
-      .getMany();
-
-    // Fetch user's blood requests
-    const requests = await this.requestRepo.find({
-      where: { requester_id: targetUserId },
-      order: { created_at: "DESC" },
-      take: 20,
-    });
-
     return {
       user: {
-        id: targetUser.id,
-        name: targetUser.name,
-        email: targetUser.email,
-        avatar_url: targetUser.avatar_url,
-        phone: isFriends ? targetUser.phone : null,
-        created_at: targetUser.created_at,
+        id: bundle.user.id,
+        name: bundle.user.name,
+        email: bundle.user.email,
+        avatar_url: bundle.user.avatar_url,
+        phone: isFriends ? bundle.user.phone : null,
+        created_at: bundle.user.created_at,
       },
-      profile: profile
+      profile: bundle.profile
         ? {
-            blood_group: profile.blood_group,
-            area_name: profile.area_name,
-            is_available: profile.is_available,
-            bio: profile.bio,
-            age: profile.age,
-            date_of_birth: profile.date_of_birth,
-            religion: profile.religion,
-            health_notes: isFriends ? profile.health_notes : null,
-            last_donation_date: profile.last_donation_date,
+            blood_group: bundle.profile.blood_group,
+            area_name: bundle.profile.area_name,
+            is_available: bundle.profile.is_available,
+            bio: bundle.profile.bio,
+            age: bundle.profile.age,
+            date_of_birth: bundle.profile.date_of_birth,
+            religion: bundle.profile.religion,
+            health_notes: isFriends ? bundle.profile.health_notes : null,
+            last_donation_date: bundle.profile.last_donation_date,
           }
         : null,
       relationship: isSelf ? "FRIENDS" : status.relationship,
       friendship_id: status.friendship_id,
-      donations: donations.map((d) => ({
-        id: d.id,
-        donation_date: d.donation_date,
-        area_name: d.response?.request?.area_name,
-        hospital_name: d.response?.request?.hospital_name,
-        blood_group: d.response?.request?.blood_group,
-      })),
-      requests: requests.map((r) => ({
-        id: r.id,
-        blood_group: r.blood_group,
-        urgency: r.urgency,
-        units_needed: r.units_needed,
-        units_fulfilled: r.units_fulfilled,
-        status: r.status,
-        area_name: r.area_name,
-        hospital_name: r.hospital_name,
-        created_at: r.created_at,
-      })),
+      donations: bundle.donations,
+      requests: bundle.requests,
     };
+  }
+
+  /**
+   * Invalidates cached profile bundle for a user.
+   */
+  async invalidateUserProfileCache(userId: string): Promise<void> {
+    await invalidateCacheKeys(this.cacheManager, [`profile:user:${userId}`]);
   }
 
   /**

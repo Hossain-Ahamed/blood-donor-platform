@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Phone, Copy, Check, UserCheck, ShieldCheck, Mail, MapPin, Flag } from "lucide-react";
+import { Phone, Copy, Check, UserCheck, ShieldCheck, Mail, MapPin, Flag, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { User, ReportTargetType } from "@repo/shared";
 import { ReportDialog } from "@/components/reports/ReportDialog";
@@ -92,18 +93,39 @@ export function RequesterInfoCard({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="relative shrink-0">
-              <Avatar className="w-16 h-16 rounded-full ring-2 ring-red-500/30 shadow-md">
-                {avatarUrl && (
-                  <AvatarImage
-                    src={avatarUrl}
-                    alt={name}
-                    className="object-cover"
-                  />
-                )}
-                <AvatarFallback className="bg-gradient-to-br from-red-500 to-rose-600 text-white font-bold text-lg">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              {requester?.id ? (
+                <Link
+                  href={`/friends/${requester.id}`}
+                  className="block hover:opacity-90 transition-opacity"
+                  title={`View ${name}'s profile`}
+                >
+                  <Avatar className="w-16 h-16 rounded-full ring-2 ring-red-500/30 shadow-md">
+                    {avatarUrl && (
+                      <AvatarImage
+                        src={avatarUrl}
+                        alt={name}
+                        className="object-cover"
+                      />
+                    )}
+                    <AvatarFallback className="bg-gradient-to-br from-red-500 to-rose-600 text-white font-bold text-lg">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
+              ) : (
+                <Avatar className="w-16 h-16 rounded-full ring-2 ring-red-500/30 shadow-md">
+                  {avatarUrl && (
+                    <AvatarImage
+                      src={avatarUrl}
+                      alt={name}
+                      className="object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="bg-gradient-to-br from-red-500 to-rose-600 text-white font-bold text-lg">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              )}
               <span
                 className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-background rounded-full"
                 title="Active Requester"
@@ -111,10 +133,20 @@ export function RequesterInfoCard({
             </div>
 
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg leading-tight text-foreground">
-                  {name}
-                </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                {requester?.id ? (
+                  <Link
+                    href={`/friends/${requester.id}`}
+                    className="font-bold text-lg leading-tight text-foreground hover:text-red-600 hover:underline transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <span>{name}</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-red-600" />
+                  </Link>
+                ) : (
+                  <h3 className="font-bold text-lg leading-tight text-foreground">
+                    {name}
+                  </h3>
+                )}
                 {requester?.role === "ADMIN" && (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                     Admin

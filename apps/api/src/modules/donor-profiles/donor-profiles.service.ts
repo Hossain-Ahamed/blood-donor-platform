@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { DonorProfile } from "../../entities/donor-profile.entity";
 import { User } from "../../entities/user.entity";
 import {
@@ -8,6 +10,7 @@ import {
   UpdateDonorProfileDto,
 } from "./dto/donor-profile.dto";
 import { Point } from "geojson";
+import { invalidateCacheKeys } from "../../common/utils/cache.util";
 
 export function calculateAge(
   dob: string | Date | null | undefined,
@@ -31,6 +34,7 @@ export class DonorProfilesService {
     private readonly donorProfileRepository: Repository<DonorProfile>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private calculateAvailability(
@@ -129,6 +133,7 @@ export class DonorProfilesService {
     if (saved.date_of_birth) {
       saved.age = calculateAge(saved.date_of_birth) ?? saved.age;
     }
+    await invalidateCacheKeys(this.cacheManager, [`profile:user:${userId}`]);
     return saved;
   }
 
@@ -178,6 +183,7 @@ export class DonorProfilesService {
     if (saved.date_of_birth) {
       saved.age = calculateAge(saved.date_of_birth) ?? saved.age;
     }
+    await invalidateCacheKeys(this.cacheManager, [`profile:user:${userId}`]);
     return saved;
   }
 

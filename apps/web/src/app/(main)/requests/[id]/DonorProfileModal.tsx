@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { bloodGroupLabels, getLabel } from "@/lib/labels";
+import Link from "next/link";
 import {
   User,
   Phone,
@@ -23,6 +24,7 @@ import {
   CheckCircle2,
   Loader2,
   Flag,
+  ExternalLink,
 } from "lucide-react";
 import { ReportDialog } from "@/components/reports/ReportDialog";
 import { ReportTargetType } from "@repo/shared";
@@ -264,8 +266,25 @@ export function DonorProfileModal({
           {response.status === "ACCEPTED" && response.donor_id && (
             <FriendActionButton
               targetUserId={response.donor_id}
+              targetUserName={donor?.name}
               size="default"
+              simple={true}
             />
+          )}
+
+          {response.donor_id && (
+            <Link
+              href={`/friends/${response.donor_id}`}
+              className="w-full sm:w-auto"
+            >
+              <Button
+                variant="outline"
+                className="w-full text-xs gap-1.5 border-muted-foreground/30 hover:border-red-300 hover:text-red-600"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                View Full Profile
+              </Button>
+            </Link>
           )}
 
           {response.status === "ACCEPTED" && donor?.phone && (

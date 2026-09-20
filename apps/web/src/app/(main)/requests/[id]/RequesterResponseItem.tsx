@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -64,18 +65,38 @@ export function RequesterResponseItem({
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Avatar className="h-11 w-11 border border-muted-foreground/20 shrink-0">
-            <AvatarImage src={donor?.avatar_url || undefined} alt={donor?.name || "Donor"} />
-            <AvatarFallback className="font-semibold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          {donor?.id ? (
+            <Link href={`/friends/${donor.id}`} className="hover:opacity-90 transition-opacity">
+              <Avatar className="h-11 w-11 border border-muted-foreground/20 shrink-0">
+                <AvatarImage src={donor?.avatar_url || undefined} alt={donor?.name || "Donor"} />
+                <AvatarFallback className="font-semibold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+          ) : (
+            <Avatar className="h-11 w-11 border border-muted-foreground/20 shrink-0">
+              <AvatarImage src={donor?.avatar_url || undefined} alt={donor?.name || "Donor"} />
+              <AvatarFallback className="font-semibold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          )}
 
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-sm text-foreground">
-                {donor?.name || "Anonymous Donor"}
-              </span>
+              {donor?.id ? (
+                <Link
+                  href={`/friends/${donor.id}`}
+                  className="font-semibold text-sm text-foreground hover:text-red-600 hover:underline transition-colors"
+                >
+                  {donor?.name || "Anonymous Donor"}
+                </Link>
+              ) : (
+                <span className="font-semibold text-sm text-foreground">
+                  {donor?.name || "Anonymous Donor"}
+                </span>
+              )}
               {donor?.blood_group && (
                 <Badge
                   variant="outline"

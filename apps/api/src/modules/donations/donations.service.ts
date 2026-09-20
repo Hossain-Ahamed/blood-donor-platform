@@ -3,14 +3,18 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Donation } from '../../entities/donation.entity';
 import { DonorProfile } from '../../entities/donor-profile.entity';
 import { BloodRequest } from '../../entities/request.entity';
 import { Response } from '../../entities/response.entity';
 import { ResponseStatus } from '@repo/shared';
+import { invalidateCacheKeys } from '../../common/utils/cache.util';
 
 @Injectable()
 export class DonationsService {
@@ -23,6 +27,7 @@ export class DonationsService {
     private readonly requestRepository: Repository<BloodRequest>,
     @InjectRepository(Response)
     private readonly responseRepository: Repository<Response>,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   async getMyDonations(userId: string): Promise<Donation[]> {
@@ -108,6 +113,16 @@ export class DonationsService {
         profile.is_available = false; // Cooldown trigger
         await this.donorProfileRepository.save(profile);
       }
+    }
+
+    // Invalidate profile caches for donor and requester so updated donation history & cooldown reflect instantly
+    const donorId = donation.response?.donor_id;
+    const requesterId = donation.response?.request?.requester_id;
+    const keysToInvalidate: string[] = [];
+    if (donorId) keysToInvalidate.push(`profile:user:${donorId}`);
+    if (requesterId) keysToInvalidate.push(`profile:user:${requesterId}`);
+    if (keysToInvalidate.length > 0) {
+      await invalidateCacheKeys(this.cacheManager, keysToInvalidate);
     }
 
     return updated;
