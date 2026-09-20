@@ -3,9 +3,12 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { Response } from "../../entities/response.entity";
 import { BloodRequest } from "../../entities/request.entity";
 import { Donation } from "../../entities/donation.entity";
@@ -15,6 +18,7 @@ import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptio
 import { DonorProfilesService, calculateAge } from "../donor-profiles/donor-profiles.service";
 import { ResponseStatus, RequestStatus } from "@repo/shared";
 import { SmartFeedService } from "../smart-feed/smart-feed.service";
+import { invalidateCacheKeys } from "../../common/utils/cache.util";
 
 @Injectable()
 export class ResponsesService {
@@ -31,6 +35,7 @@ export class ResponsesService {
     private readonly userRepository: Repository<User>,
     private readonly pushSubscriptionsService: PushSubscriptionsService,
     private readonly smartFeedService: SmartFeedService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   async create(
@@ -121,6 +126,13 @@ export class ResponsesService {
     });
 
     const saved = await this.responseRepository.save(response);
+
+    // Warm lifetime connection cache for requester and donor (symmetrically sorted)
+    const [u1, u2] = [donorId, request.requester_id].sort();
+    this.cacheManager
+      .set(`users:req-connected:${u1}:${u2}`, "true", 24 * 60 * 60 * 1000)
+      .catch(() => {});
+
     this.smartFeedService.invalidateFeedCache(request.requester_id);
     this.notifyRequesterOfOffer(request, donorId);
     return saved;
@@ -282,6 +294,22 @@ export class ResponsesService {
         request.status = RequestStatus.PARTIALLY_FULFILLED;
       }
       await this.requestRepository.save(request);
+
+      await invalidateCacheKeys(this.cacheManager, [
+        `profile:user:${request.requester_id}`,
+        `profile:user:${response.donor_id}`,
+      ]);
+
+      try {
+        const [u1, u2] = [request.requester_id, response.donor_id].sort();
+        await this.cacheManager.set(
+          `users:req-connected:${u1}:${u2}`,
+          "true",
+          24 * 60 * 60 * 1000,
+        );
+      } catch {
+        // failover
+      }
     }
 
     if (

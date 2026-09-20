@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DonorProfilesService } from "./donor-profiles.service";
 import { getRepositoryToken } from "@nestjs/typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { DonorProfile } from "../../entities/donor-profile.entity";
 import { User } from "../../entities/user.entity";
 
@@ -18,6 +19,14 @@ describe("DonorProfilesService", () => {
         {
           provide: getRepositoryToken(User),
           useValue: {},
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+          },
         },
       ],
     }).compile();

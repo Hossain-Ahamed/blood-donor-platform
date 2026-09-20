@@ -114,6 +114,8 @@ export default async function RequestDetailPage({
         urgency={request.urgency}
         createdAt={request.created_at}
         user={user}
+        isOwnRequest={isOwnRequest}
+        requesterId={request.requester_id}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -122,9 +124,20 @@ export default async function RequestDetailPage({
             requester={request.requester}
             contactPhone={request.contact_phone || ""}
             requesterProfile={request.requester_profile}
+            isOwnProfile={Boolean(
+              user?.id &&
+                (user.id === request.requester?.id ||
+                  user.id === request.requester_id),
+            )}
+            requestStatus={request.status}
+            isAdmin={user?.role === "ADMIN"}
           />
 
-          <PatientMedicalDetailsCard request={request} />
+          <PatientMedicalDetailsCard
+            request={request}
+            isOwnRequest={isOwnRequest}
+            isAdmin={user?.role === "ADMIN"}
+          />
 
           <HospitalLocationCard
             hospitalName={request.hospital_name}

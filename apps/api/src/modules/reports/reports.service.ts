@@ -52,22 +52,28 @@ export class ReportsService {
    * Submits a new user/request report with duplicate cooldown and target validation.
    */
   async create(userId: string, dto: CreateReportDto): Promise<Report> {
-    // 1. Verify target exists
-    let targetExists = false;
+    // 1. Verify target exists and prevent reporting oneself or own request
     if (dto.target_type === ReportTargetType.USER) {
-      targetExists = await this.userRepository.exists({
+      if (dto.target_id === userId) {
+        throw new BadRequestException("You cannot report yourself");
+      }
+      const targetExists = await this.userRepository.exists({
         where: { id: dto.target_id },
       });
+      if (!targetExists) {
+        throw new NotFoundException("Target user not found");
+      }
     } else if (dto.target_type === ReportTargetType.REQUEST) {
-      targetExists = await this.requestRepository.exists({
+      const bloodReq = await this.requestRepository.findOne({
         where: { id: dto.target_id },
+        select: ["id", "requester_id"],
       });
-    }
-
-    if (!targetExists) {
-      throw new NotFoundException(
-        `Target ${dto.target_type.toLowerCase()} not found`,
-      );
+      if (!bloodReq) {
+        throw new NotFoundException("Target request not found");
+      }
+      if (bloodReq.requester_id === userId) {
+        throw new BadRequestException("You cannot report your own request");
+      }
     }
 
     // 2. Prevent abusive duplicate reporting on the exact same target by the same user within 15 mins
@@ -285,6 +291,9 @@ export class ReportsService {
         const prevReqStatus = bloodReq.status;
         bloodReq.status = RequestStatus.CANCELLED;
         await this.requestRepository.save(bloodReq);
+        await invalidateCacheKeys(this.cacheManager, [
+          `profile:user:${bloodReq.requester_id}`,
+        ]);
         await this.auditLogsService.record(
           adminId,
           "CANCEL_REQUEST",

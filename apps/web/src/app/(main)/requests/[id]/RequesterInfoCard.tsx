@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Phone, Copy, Check, UserCheck, ShieldCheck, Mail, MapPin, Flag, ExternalLink } from "lucide-react";
+import { Phone, PhoneOff, Copy, Check, UserCheck, ShieldCheck, Mail, MapPin, Flag, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { User, ReportTargetType } from "@repo/shared";
 import { ReportDialog } from "@/components/reports/ReportDialog";
@@ -20,18 +20,26 @@ interface RequesterInfoCardProps {
     is_available?: boolean | null;
     last_donation_date?: string | Date | null;
   } | null;
+  isOwnProfile?: boolean;
+  requestStatus?: string;
+  isAdmin?: boolean;
 }
 
 export function RequesterInfoCard({
   requester,
   contactPhone,
   requesterProfile,
+  isOwnProfile,
+  requestStatus,
+  isAdmin,
 }: RequesterInfoCardProps) {
   const [copied, setCopied] = useState(false);
   const name = requester?.name || "Requester";
   const primaryPhone = contactPhone || requester?.phone || "";
   const profilePhone = requester?.phone;
   const avatarUrl = requester?.avatar_url;
+  const isClosed =
+    requestStatus === "CANCELLED" || requestStatus === "FULFILLED";
 
   const initials =
     name
@@ -62,7 +70,7 @@ export function RequesterInfoCard({
             Requester Details & Contact
           </CardTitle>
           <div className="flex items-center gap-2">
-            {requester?.id && (
+            {!isOwnProfile && requester?.id && (
               <ReportDialog
                 targetType={ReportTargetType.USER}
                 targetId={requester.id}
@@ -165,7 +173,7 @@ export function RequesterInfoCard({
                   </>
                 )}
               </p>
-              {requester?.email && (
+              {requester?.email && (!isClosed || isOwnProfile || isAdmin) && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Mail className="w-3 h-3 text-muted-foreground" />
                   {requester.email}
@@ -175,7 +183,14 @@ export function RequesterInfoCard({
           </div>
 
           <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
-            {primaryPhone ? (
+            {isClosed && !isOwnProfile && !isAdmin ? (
+              <div className="flex items-center gap-2 bg-muted/60 px-3.5 py-2 rounded-lg border border-border/70 text-muted-foreground text-xs">
+                <PhoneOff className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span>
+                  Contact hidden (Request is {requestStatus === "FULFILLED" ? "fulfilled" : "cancelled"})
+                </span>
+              </div>
+            ) : primaryPhone ? (
               <>
                 <div className="flex items-center justify-between sm:justify-end gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border border-border w-full sm:w-auto">
                   <div className="flex items-center gap-2">
@@ -206,30 +221,36 @@ export function RequesterInfoCard({
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-1.5 shadow-sm"
                     >
                       <Phone className="w-3.5 h-3.5" />
-                      Call Requester
-                    </Button>
+                      Call Patient / Attendant
+                    </Button> 
                   </a>
                 </div>
+                {isClosed && (isOwnProfile || isAdmin) && (
+                  <span className="text-[10px] text-muted-foreground">
+                    (Visible only to you & admin - {requestStatus === "FULFILLED" ? "Fulfilled" : "Cancelled"})
+                  </span>
+                )}
               </>
             ) : (
-              <p className="text-xs text-muted-foreground italic">
-                No phone number provided
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground italic">
+                <PhoneOff className="w-3.5 h-3.5" />
+                <span>No phone number provided</span>
+              </div>
             )}
           </div>
         </div>
 
-        {profilePhone && primaryPhone !== profilePhone && (
+        {profilePhone && primaryPhone !== profilePhone && (!isClosed || isOwnProfile || isAdmin) && (
           <div className="pt-3 border-t border-dashed text-xs text-muted-foreground flex items-center justify-between">
             <span>
-              Alternate Profile Phone:{" "}
+              Phone:{" "}
               <strong className="font-mono">{profilePhone}</strong>
             </span>
             <a
               href={`tel:${profilePhone}`}
               className="text-blue-600 hover:underline font-medium"
             >
-              Call Alternate
+              Call Requester
             </a>
           </div>
         )}

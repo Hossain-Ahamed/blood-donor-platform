@@ -12,6 +12,8 @@ interface RequestDetailHeaderProps {
   urgency?: string;
   createdAt: string | Date;
   user: User | null;
+  isOwnRequest?: boolean;
+  requesterId?: string;
 }
 
 export function RequestDetailHeader({
@@ -20,6 +22,8 @@ export function RequestDetailHeader({
   urgency,
   createdAt,
   user,
+  isOwnRequest,
+  requesterId,
 }: RequestDetailHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -29,14 +33,11 @@ export function RequestDetailHeader({
             Need {getLabel(bloodGroupLabels, bloodGroup)}
           </h1>
           {urgency === "CRITICAL" ? (
-            <Badge
-              variant="destructive"
-              className="text-xs px-2.5 py-1 font-bold bg-red-600 animate-pulse shadow-xs"
-            >
+            <Badge variant="outline" className="text-red-600 font-semibold text-xs bg-transparent hover:bg-transparent hover:text-red-600 border-red-600">
               Critical (Immediate)
             </Badge>
           ) : urgency === "URGENT" ? (
-            <Badge className="text-xs px-2.5 py-1 font-bold bg-amber-600 hover:bg-amber-600 text-white shadow-xs">
+            <Badge variant="outline"   className="font-semibold text-xs border-blue-300 text-blue-700 dark:text-blue-400">
               Urgent (Within 24h)
             </Badge>
           ) : (
@@ -73,41 +74,23 @@ export function RequestDetailHeader({
           </Link>
         )}
 
-        <ReportDialog
-          targetType={ReportTargetType.REQUEST}
-          targetId={id}
-          targetTitle={`Need ${getLabel(bloodGroupLabels, bloodGroup)}`}
-          trigger={
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border/80 text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/10 flex items-center gap-1.5 font-medium text-xs h-9 shadow-xs"
-            >
-              <Flag className="w-3.5 h-3.5" />
-              <span>Report</span>
-            </Button>
-          }
-        />
-
-
-        {urgency === "CRITICAL" ? (
-          <Badge
-            variant="destructive"
-            className="text-sm md:text-base px-3.5 py-1.5 font-bold bg-red-600 animate-pulse shadow-xs"
-          >
-            🚨 Critical Urgency
-          </Badge>
-        ) : urgency === "URGENT" ? (
-          <Badge className="text-sm md:text-base px-3.5 py-1.5 font-bold bg-amber-600 hover:bg-amber-600 text-white shadow-xs">
-            ⚡ Urgent (Within 24h)
-          </Badge>
-        ) : (
-          <Badge
-            variant="outline"
-            className="text-sm md:text-base px-3.5 py-1.5 font-semibold border-blue-300 text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30"
-          >
-            Normal Urgency
-          </Badge>
+        {!isOwnRequest && (
+          <ReportDialog
+            targetType={ReportTargetType.REQUEST}
+            targetId={id}
+            targetOwnerId={requesterId}
+            targetTitle={`Need ${getLabel(bloodGroupLabels, bloodGroup)}`}
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-border/80 text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/10 flex items-center gap-1.5 font-medium text-xs h-9 shadow-xs"
+              >
+                <Flag className="w-3.5 h-3.5" />
+                <span>Report</span>
+              </Button>
+            }
+          />
         )}
       </div>
     </div>

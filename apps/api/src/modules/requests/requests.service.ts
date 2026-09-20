@@ -180,13 +180,31 @@ export class RequestsService {
     return savedRequest;
   }
 
-  async findOne(id: string): Promise<BloodRequest> {
+  async findOne(
+    id: string,
+    user?: { id?: string; role?: string },
+  ): Promise<BloodRequest> {
     const request = await this.requestRepository.findOne({
       where: { id },
       relations: ["requester"],
     });
     if (!request) {
       throw new NotFoundException("Request not found");
+    }
+
+    const isOwn = user?.id && user.id === request.requester_id;
+    const isAdmin = user?.role === "ADMIN";
+    const isClosed =
+      request.status === RequestStatus.CANCELLED ||
+      request.status === RequestStatus.FULFILLED;
+
+    // When request is CANCELLED or FULFILLED, sensitive contact numbers and email are hidden from strangers and non-requesters
+    if (isClosed && !isOwn && !isAdmin) {
+      (request as any).contact_phone = null;
+      if (request.requester) {
+        (request.requester as any).phone = null;
+        (request.requester as any).email = null;
+      }
     }
     if (this.donorProfilesService?.findByUserId) {
       try {

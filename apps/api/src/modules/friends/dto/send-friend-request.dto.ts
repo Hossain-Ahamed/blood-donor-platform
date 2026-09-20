@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsEmail } from "class-validator";
+import { IsUUID, IsOptional, IsEmail, IsString } from "class-validator";
 
 export class SendFriendRequestDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class SendFriendRequestDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }

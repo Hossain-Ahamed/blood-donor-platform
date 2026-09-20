@@ -22,6 +22,7 @@ import Link from "next/link";
 interface ReportDialogProps {
   targetType: ReportTargetType;
   targetId: string;
+  targetOwnerId?: string;
   targetTitle?: string;
   trigger?: React.ReactNode;
 }
@@ -46,6 +47,7 @@ const USER_PRESETS = [
 export function ReportDialog({
   targetType,
   targetId,
+  targetOwnerId,
   targetTitle,
   trigger,
 }: ReportDialogProps) {
@@ -55,11 +57,26 @@ export function ReportDialog({
   const [details, setDetails] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Prevent users from reporting themselves or their own requests
+  const isSelfOrOwn = Boolean(
+    user?.id &&
+      (user.id === targetId || (targetOwnerId && user.id === targetOwnerId)),
+  );
+
+  if (isSelfOrOwn) {
+    return null;
+  }
+
   const presets =
     targetType === ReportTargetType.REQUEST ? REQUEST_PRESETS : USER_PRESETS;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSelfOrOwn) {
+      toast.error("You cannot report yourself or your own request.");
+      return;
+    }
 
     if (!user) {
       toast.error("You must be signed in to submit a report.");

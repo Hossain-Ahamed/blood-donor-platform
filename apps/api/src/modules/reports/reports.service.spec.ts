@@ -100,6 +100,31 @@ describe("ReportsService", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it("should throw BadRequestException if user tries to report themselves", async () => {
+      await expect(
+        service.create("user-1", {
+          target_type: ReportTargetType.USER,
+          target_id: "user-1",
+          reason: "Self report",
+        }),
+      ).rejects.toThrow(new BadRequestException("You cannot report yourself"));
+    });
+
+    it("should throw BadRequestException if user tries to report their own request", async () => {
+      requestRepoMock.findOne.mockResolvedValue({
+        id: "req-1",
+        requester_id: "user-1",
+      });
+
+      await expect(
+        service.create("user-1", {
+          target_type: ReportTargetType.REQUEST,
+          target_id: "req-1",
+          reason: "Own request report",
+        }),
+      ).rejects.toThrow(new BadRequestException("You cannot report your own request"));
+    });
+
     it("should throw BadRequestException if reporting is attempted within cooldown period", async () => {
       userRepoMock.exists.mockResolvedValue(true);
       cacheManagerMock.get.mockResolvedValue("1"); // Active cooldown

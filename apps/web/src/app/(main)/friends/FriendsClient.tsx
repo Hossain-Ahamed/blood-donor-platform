@@ -64,8 +64,9 @@ export function FriendsClient({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Find friends (search by email/name) tab state
+  // Find friends (search exclusively by exact email/phone) tab state
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchedTerm, setSearchedTerm] = useState("");
   const [searchResults, setSearchResults] = useState<FriendUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -256,15 +257,17 @@ export function FriendsClient({
     if (!query) return;
 
     setIsSearching(true);
-    setHasSearched(true);
+    setSearchedTerm(query);
     try {
       const results = await apiClient.request<FriendUser[]>(
         `/friends/search?q=${encodeURIComponent(query)}`,
       );
       setSearchResults(Array.isArray(results) ? results : []);
+      setHasSearched(true);
     } catch (err: any) {
       toast.error(err?.message || "Search failed");
       setSearchResults([]);
+      setHasSearched(true);
     } finally {
       setIsSearching(false);
     }
@@ -298,7 +301,7 @@ export function FriendsClient({
               className="bg-white text-red-600 hover:bg-red-50 font-semibold text-xs sm:text-sm shadow-sm gap-2 h-10 px-4"
             >
               <UserPlus className="w-4 h-4" />
-              Find by Email
+              Find Friends
             </Button>
           </div>
         </div>
@@ -701,17 +704,17 @@ export function FriendsClient({
           </div>
         </TabsContent>
 
-        {/* Tab 3: Search by Email or Name */}
+        {/* Tab 3: Search exclusively by Email or Phone Number */}
         <TabsContent value="search" className="space-y-6">
           <Card className="p-6 border bg-card">
             <div className="space-y-4 max-w-xl">
               <div className="space-y-1">
                 <h3 className="font-bold text-base flex items-center gap-2">
                   <Search className="w-4 h-4 text-red-600" />
-                  Search Donors & Users
+                  Find Friends by Email or Phone Number
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Find friends by entering their email address or full name.
+                  Search requires an exact email address or exact phone number.
                 </p>
               </div>
 
@@ -720,16 +723,33 @@ export function FriendsClient({
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="Enter email address (e.g. john@example.com) or name..."
-                    className="pl-9 h-11 text-xs sm:text-sm"
+                    placeholder="Enter exact email (user@example.com) or phone number (019XXXXXXXX)..."
+                    className="pl-9 pr-9 h-11 text-xs sm:text-sm"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setHasSearched(false);
+                    }}
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setHasSearched(false);
+                        setSearchResults([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                      title="Clear input"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
                 <Button
                   type="submit"
                   disabled={isSearching || !searchQuery.trim()}
-                  className="bg-red-600 hover:bg-red-700 text-white h-11 px-5"
+                  className="bg-red-600 hover:bg-red-700 text-white h-11 px-5 font-semibold"
                 >
                   {isSearching ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -751,8 +771,7 @@ export function FriendsClient({
               {searchResults.length === 0 ? (
                 <Card className="p-8 text-center border-dashed">
                   <p className="text-sm text-muted-foreground">
-                    No users found matching &quot;{searchQuery}&quot;. Please check the
-                    email and try again.
+                    No user found matching &quot;{searchedTerm}&quot;. Please make sure you entered the exact email address or complete phone number.
                   </p>
                 </Card>
               ) : (

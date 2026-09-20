@@ -47,7 +47,11 @@ export class FriendsController {
     @CurrentUser() user: any,
     @Param("friendUserId") friendUserId: string,
   ) {
-    return this.friendsService.getFriendProfile(user.id, friendUserId);
+    return this.friendsService.getFriendProfile(
+      user.id,
+      friendUserId,
+      user?.role === "ADMIN",
+    );
   }
 
   @Post("request")

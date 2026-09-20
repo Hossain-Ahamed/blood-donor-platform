@@ -107,10 +107,10 @@ export function RequestFormBloodSection({
                       Normal (Within a few days)
                     </SelectItem>
                     <SelectItem value="URGENT" label="Urgent (Within 24 Hours)">
-                      ⚡ Urgent (Within 24 Hours)
+                      Urgent (Within 24 Hours)
                     </SelectItem>
                     <SelectItem value="CRITICAL" label="Critical (Immediate / Emergency)">
-                      🚨 Critical (Immediate / Emergency)
+                      Critical (Immediate / Emergency)
                     </SelectItem>
                   </SelectContent>
                 </Select>

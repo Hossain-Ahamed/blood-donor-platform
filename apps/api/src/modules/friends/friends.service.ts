@@ -16,6 +16,7 @@ import { User } from "../../entities/user.entity";
 import { DonorProfile } from "../../entities/donor-profile.entity";
 import { BloodRequest } from "../../entities/request.entity";
 import { Donation } from "../../entities/donation.entity";
+import { Response } from "../../entities/response.entity";
 import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
 import { SmartFeedService } from "../smart-feed/smart-feed.service";
 import {
@@ -23,6 +24,7 @@ import {
   FriendshipRelationStatus,
   FriendUser,
   FriendProfileDetail,
+  RequestStatus,
 } from "@repo/shared";
 import {
   getOrSetWithStampedeProtection,
@@ -47,6 +49,8 @@ export class FriendsService {
     private readonly requestRepo: Repository<BloodRequest>,
     @InjectRepository(Donation)
     private readonly donationRepo: Repository<Donation>,
+    @InjectRepository(Response)
+    private readonly responseRepo: Repository<Response>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly pushSubscriptionsService: PushSubscriptionsService,
     private readonly smartFeedService: SmartFeedService,
@@ -69,6 +73,33 @@ export class FriendsService {
       targetUser = await this.userRepo.findOne({
         where: { email: dto.email.trim().toLowerCase(), is_active: true },
       });
+    } else if (dto.phone) {
+      const cleanPhone = dto.phone.trim();
+      const digitsOnly = cleanPhone.replace(/[^0-9]/g, "");
+      const phoneCandidates = new Set<string>();
+      phoneCandidates.add(cleanPhone);
+      if (digitsOnly.length >= 6) {
+        phoneCandidates.add(digitsOnly);
+        phoneCandidates.add(`+${digitsOnly}`);
+        if (digitsOnly.startsWith("0") && digitsOnly.length === 11) {
+          phoneCandidates.add(`88${digitsOnly}`);
+          phoneCandidates.add(`+88${digitsOnly}`);
+        } else if (digitsOnly.startsWith("880") && digitsOnly.length === 13) {
+          phoneCandidates.add(`0${digitsOnly.slice(3)}`);
+          phoneCandidates.add(`+${digitsOnly}`);
+        }
+      }
+      targetUser = await this.userRepo
+        .createQueryBuilder("u")
+        .where("u.is_active = true")
+        .andWhere(
+          "(u.phone IN (:...phoneCandidates) OR REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g') = :digitsOnly)",
+          {
+            phoneCandidates: Array.from(phoneCandidates),
+            digitsOnly,
+          },
+        )
+        .getOne();
     }
 
     if (!targetUser) {
@@ -560,7 +591,8 @@ export class FriendsService {
   }
 
   /**
-   * Searches users by email or name, returning relationship status and donor profiles.
+   * Searches users exclusively by exact email or exact phone number.
+   * Both email and phone queries require an exact match (no partial/fuzzy/name matches).
    */
   async searchUsers(userId: string, query: string): Promise<FriendUser[]> {
     const trimmed = (query || "").trim();
@@ -568,16 +600,42 @@ export class FriendsService {
       return [];
     }
 
-    const users = await this.userRepo
+    const cleanedDigits = trimmed.replace(/[^0-9]/g, "");
+    const phoneCandidates = new Set<string>();
+    phoneCandidates.add(trimmed);
+    if (cleanedDigits.length >= 6) {
+      phoneCandidates.add(cleanedDigits);
+      phoneCandidates.add(`+${cleanedDigits}`);
+      if (cleanedDigits.startsWith("0") && cleanedDigits.length === 11) {
+        phoneCandidates.add(`88${cleanedDigits}`);
+        phoneCandidates.add(`+88${cleanedDigits}`);
+      } else if (cleanedDigits.startsWith("880") && cleanedDigits.length === 13) {
+        phoneCandidates.add(`0${cleanedDigits.slice(3)}`);
+        phoneCandidates.add(`+${cleanedDigits}`);
+      }
+    }
+
+    const qb = this.userRepo
       .createQueryBuilder("u")
       .where("u.id != :userId", { userId })
-      .andWhere("u.is_active = true")
-      .andWhere(
-        "(LOWER(u.email) LIKE LOWER(:q) OR LOWER(u.name) LIKE LOWER(:q))",
-        { q: `%${trimmed}%` },
-      )
-      .take(20)
-      .getMany();
+      .andWhere("u.is_active = true");
+
+    if (cleanedDigits.length >= 6) {
+      qb.andWhere(
+        "(LOWER(u.email) = LOWER(:email) OR u.phone IN (:...phoneCandidates) OR REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g') = :cleanedDigits)",
+        {
+          email: trimmed,
+          phoneCandidates: Array.from(phoneCandidates),
+          cleanedDigits,
+        },
+      );
+    } else {
+      qb.andWhere("LOWER(u.email) = LOWER(:email)", {
+        email: trimmed,
+      });
+    }
+
+    const users = await qb.take(20).getMany();
 
     if (users.length === 0) {
       return [];
@@ -637,13 +695,67 @@ export class FriendsService {
   }
 
   /**
+   * Checks if two users have a lifetime request connection (one was requester, the other responded as donor).
+   * Caches result in Redis with a 24-hour TTL under a normalized symmetric key.
+   * Uses LIMIT 1 on indexed fields for maximum DB efficiency.
+   */
+  async hasLifetimeRequestConnection(
+    userId: string,
+    targetUserId: string,
+  ): Promise<boolean> {
+    if (userId === targetUserId) return true;
+
+    const [u1, u2] = [userId, targetUserId].sort();
+    const cacheKey = `users:req-connected:${u1}:${u2}`;
+
+    try {
+      const cached = await this.cacheManager.get<string | boolean>(cacheKey);
+      if (cached !== null && cached !== undefined) {
+        return cached === "true" || cached === true;
+      }
+    } catch (e) {
+      this.logger.warn(`Failed to read connection cache: ${e}`);
+    }
+
+    // High performance query: uses index on responses and requests, LIMIT 1 stops immediately on first match
+    const match = await this.responseRepo
+      .createQueryBuilder("resp")
+      .innerJoin("resp.request", "req")
+      .select("resp.id")
+      .where(
+        "((resp.donor_id = :u1 AND req.requester_id = :u2) OR (resp.donor_id = :u2 AND req.requester_id = :u1))",
+        { u1, u2 },
+      )
+      .limit(1)
+      .getRawOne();
+
+    const isConnected = Boolean(match);
+
+    try {
+      await this.cacheManager.set(
+        cacheKey,
+        isConnected ? "true" : "false",
+        24 * 60 * 60 * 1000,
+      );
+    } catch (e) {
+      this.logger.warn(`Failed to set connection cache: ${e}`);
+    }
+
+    return isConnected;
+  }
+
+  /**
    * Returns a user's full profile, donation history, and blood requests.
-   * If friends, contact phone and detailed history are visible.
+   * Access Rules:
+   * - Self and Admins can always view full profiles.
+   * - If the target user has an active OPEN blood request, anyone can view their profile details.
+   * - Otherwise, only friends and lifetime-connected donors/requesters can view the profile.
    * Caches the heavy underlying profile bundle in Redis for 5 minutes with stampede protection.
    */
   async getFriendProfile(
     userId: string,
     targetUserId: string,
+    isAdmin = false,
   ): Promise<FriendProfileDetail> {
     const cacheKey = `profile:user:${targetUserId}`;
 
@@ -669,6 +781,7 @@ export class FriendsService {
       } | null;
       donations: FriendProfileDetail["donations"];
       requests: FriendProfileDetail["requests"];
+      has_open_request: boolean;
     }
 
     const bundle = await getOrSetWithStampedeProtection<CachedUserProfileBundle | null>(
@@ -703,6 +816,21 @@ export class FriendsService {
           order: { created_at: "DESC" },
           take: 20,
         });
+
+        // Check if user has an active OPEN request without unnecessary DB queries
+        let hasOpenRequest = requests.some(
+          (r) =>
+            r.status === RequestStatus.OPEN ||
+            r.status === RequestStatus.PARTIALLY_FULFILLED,
+        );
+        if (!hasOpenRequest && requests.length === 20) {
+          hasOpenRequest = await this.requestRepo.exists({
+            where: [
+              { requester_id: targetUserId, status: RequestStatus.OPEN },
+              { requester_id: targetUserId, status: RequestStatus.PARTIALLY_FULFILLED },
+            ],
+          });
+        }
 
         return {
           user: {
@@ -744,6 +872,7 @@ export class FriendsService {
             hospital_name: r.hospital_name,
             created_at: r.created_at,
           })),
+          has_open_request: hasOpenRequest,
         };
       },
       300000, // 5 minutes TTL
@@ -754,8 +883,47 @@ export class FriendsService {
     }
 
     const isSelf = userId === targetUserId;
-    const status = await this.getStatus(userId, targetUserId);
-    const isFriends = isSelf || status.relationship === "FRIENDS";
+    let canView = isSelf || isAdmin;
+    let isFriends = false;
+    let isConnected = false;
+    let relationship: FriendshipRelationStatus = "NONE";
+    let friendshipId: string | undefined;
+
+    if (bundle.has_open_request) {
+      // Anyone is allowed to view the profile if there is an active open blood request
+      canView = true;
+    }
+
+    if (!isSelf) {
+      const status = await this.getStatus(userId, targetUserId);
+      relationship = status.relationship;
+      friendshipId = status.friendship_id;
+      isFriends = relationship === "FRIENDS";
+
+      if (isFriends) {
+        canView = true;
+      } else if (!canView) {
+        // Not friends and no open request: check lifetime request connection
+        isConnected = await this.hasLifetimeRequestConnection(userId, targetUserId);
+        if (isConnected) {
+          canView = true;
+        }
+      } else {
+        // Can view because open request, also check connection to determine phone visibility
+        isConnected = await this.hasLifetimeRequestConnection(userId, targetUserId);
+      }
+    } else {
+      relationship = "FRIENDS";
+      isFriends = true;
+    }
+
+    if (!canView) {
+      throw new ForbiddenException(
+        "This profile is only visible while there is an active blood request, or to friends and connected donors.",
+      );
+    }
+
+    const canSeePrivateDetails = isFriends || isConnected || isAdmin || isSelf;
 
     return {
       user: {
@@ -763,7 +931,7 @@ export class FriendsService {
         name: bundle.user.name,
         email: bundle.user.email,
         avatar_url: bundle.user.avatar_url,
-        phone: isFriends ? bundle.user.phone : null,
+        phone: canSeePrivateDetails ? bundle.user.phone : null,
         created_at: bundle.user.created_at,
       },
       profile: bundle.profile
@@ -775,12 +943,12 @@ export class FriendsService {
             age: bundle.profile.age,
             date_of_birth: bundle.profile.date_of_birth,
             religion: bundle.profile.religion,
-            health_notes: isFriends ? bundle.profile.health_notes : null,
+            health_notes: canSeePrivateDetails ? bundle.profile.health_notes : null,
             last_donation_date: bundle.profile.last_donation_date,
           }
         : null,
-      relationship: isSelf ? "FRIENDS" : status.relationship,
-      friendship_id: status.friendship_id,
+      relationship,
+      friendship_id: friendshipId,
       donations: bundle.donations,
       requests: bundle.requests,
     };

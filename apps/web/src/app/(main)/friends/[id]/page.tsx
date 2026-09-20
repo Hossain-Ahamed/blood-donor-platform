@@ -42,6 +42,8 @@ export default async function FriendProfilePage({
 
   let detail: FriendProfileDetail | null = null;
   let shouldRedirectToLogin = false;
+  let isRestricted = false;
+  let restrictedMessage = "";
 
   try {
     const res = await apiServer.request<FriendProfileDetail>(
@@ -53,6 +55,11 @@ export default async function FriendProfilePage({
   } catch (err: any) {
     if (err?.status === 401 || err?.statusCode === 401) {
       shouldRedirectToLogin = true;
+    } else if (err?.status === 403 || err?.statusCode === 403) {
+      isRestricted = true;
+      restrictedMessage =
+        err?.data?.message ||
+        "This profile is only visible while there is an active blood request, or to friends and connected donors.";
     } else {
       console.error("Failed to load friend profile:", err);
     }
@@ -60,6 +67,53 @@ export default async function FriendProfilePage({
 
   if (shouldRedirectToLogin) {
     redirect(`/login?redirect=/friends/${id}`);
+  }
+
+  if (isRestricted) {
+    return (
+      <div className="container max-w-xl mx-auto py-12 px-4 space-y-6">
+        <div>
+          <Link
+            href="/friends"
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Friends
+          </Link>
+        </div>
+
+        <Card className="border shadow-sm text-center overflow-hidden">
+          <div className="h-20 bg-gradient-to-r from-red-600/20 via-rose-600/20 to-red-600/20 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-background border shadow-sm flex items-center justify-center -mb-8">
+              <Lock className="w-6 h-6 text-red-600" />
+            </div>
+          </div>
+          <CardContent className="pt-8 pb-8 px-6 space-y-4">
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-bold tracking-tight">Profile Restricted</h2>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                {restrictedMessage}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-muted/40 border text-xs text-muted-foreground max-w-md mx-auto text-left space-y-2">
+              <p className="font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-red-600" />
+                Community Privacy Policy
+              </p>
+              <p>
+                Profiles on RoktoLink are only public when a user has an active blood request, or to their accepted friends and donors who have connected on requests.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <FriendActionButton targetUserId={id} size="default" />
+           
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!detail) {

@@ -158,6 +158,88 @@ describe("RequestsService", () => {
     });
   });
 
+  describe("findOne", () => {
+    it("should redact contact phone, requester phone, and email when request is FULFILLED and viewer is stranger", async () => {
+      const req = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.FULFILLED,
+        contact_phone: "01711111111",
+        requester: {
+          id: "user-1",
+          phone: "01722222222",
+          email: "user1@example.com",
+        },
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(req);
+
+      const result = await service.findOne("req-1", { id: "stranger-2", role: "USER" });
+      expect(result.contact_phone).toBeNull();
+      expect(result.requester.phone).toBeNull();
+      expect(result.requester.email).toBeNull();
+    });
+
+    it("should redact contact phone, requester phone, and email when request is CANCELLED and viewer is stranger", async () => {
+      const req = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.CANCELLED,
+        contact_phone: "01711111111",
+        requester: {
+          id: "user-1",
+          phone: "01722222222",
+          email: "user1@example.com",
+        },
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(req);
+
+      const result = await service.findOne("req-1", { id: "stranger-2", role: "USER" });
+      expect(result.contact_phone).toBeNull();
+      expect(result.requester.phone).toBeNull();
+      expect(result.requester.email).toBeNull();
+    });
+
+    it("should preserve contact phone when request is FULFILLED if viewer is the requester", async () => {
+      const req = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.FULFILLED,
+        contact_phone: "01711111111",
+        requester: {
+          id: "user-1",
+          phone: "01722222222",
+          email: "user1@example.com",
+        },
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(req);
+
+      const result = await service.findOne("req-1", { id: "user-1", role: "USER" });
+      expect(result.contact_phone).toBe("01711111111");
+      expect(result.requester.phone).toBe("01722222222");
+      expect(result.requester.email).toBe("user1@example.com");
+    });
+
+    it("should preserve contact phone when request is OPEN for any viewer", async () => {
+      const req = {
+        id: "req-1",
+        requester_id: "user-1",
+        status: RequestStatus.OPEN,
+        contact_phone: "01711111111",
+        requester: {
+          id: "user-1",
+          phone: "01722222222",
+          email: "user1@example.com",
+        },
+      };
+      requestRepositoryMock.findOne.mockResolvedValue(req);
+
+      const result = await service.findOne("req-1", { id: "stranger-2", role: "USER" });
+      expect(result.contact_phone).toBe("01711111111");
+      expect(result.requester.phone).toBe("01722222222");
+      expect(result.requester.email).toBe("user1@example.com");
+    });
+  });
+
   describe("update", () => {
     it("should allow requester to update their own request details and status", async () => {
       const existing = {

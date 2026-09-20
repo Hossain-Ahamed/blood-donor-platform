@@ -7,10 +7,11 @@ import { User } from "../../entities/user.entity";
 import { DonorProfile } from "../../entities/donor-profile.entity";
 import { BloodRequest } from "../../entities/request.entity";
 import { Donation } from "../../entities/donation.entity";
+import { Response } from "../../entities/response.entity";
 import { PushSubscriptionsService } from "../push-subscriptions/push-subscriptions.service";
 import { SmartFeedService } from "../smart-feed/smart-feed.service";
-import { FriendshipStatus } from "@repo/shared";
-import { ConflictException, BadRequestException } from "@nestjs/common";
+import { FriendshipStatus, RequestStatus } from "@repo/shared";
+import { ConflictException, BadRequestException, ForbiddenException } from "@nestjs/common";
 
 describe("FriendsService", () => {
   let service: FriendsService;
@@ -19,6 +20,7 @@ describe("FriendsService", () => {
   let donorProfileRepoMock: any;
   let requestRepoMock: any;
   let donationRepoMock: any;
+  let responseRepoMock: any;
   let cacheManagerMock: any;
   let pushServiceMock: any;
   let smartFeedServiceMock: any;
@@ -74,7 +76,23 @@ describe("FriendsService", () => {
     };
 
     donationRepoMock = {
-      createQueryBuilder: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      }),
+    };
+
+    responseRepoMock = {
+      createQueryBuilder: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue(null),
+      }),
     };
 
     pushServiceMock = {
@@ -107,6 +125,10 @@ describe("FriendsService", () => {
         {
           provide: getRepositoryToken(Donation),
           useValue: donationRepoMock,
+        },
+        {
+          provide: getRepositoryToken(Response),
+          useValue: responseRepoMock,
         },
         {
           provide: CACHE_MANAGER,
@@ -213,6 +235,138 @@ describe("FriendsService", () => {
       expect(friendshipRepoMock.delete).toHaveBeenCalledWith("f-1");
       expect(smartFeedServiceMock.invalidateFeedCache).toHaveBeenCalledWith("user-uuid");
       expect(smartFeedServiceMock.invalidateFeedCache).toHaveBeenCalledWith("target-uuid");
+    });
+  });
+
+  describe("getFriendProfile", () => {
+    it("should allow a user to view their own profile", async () => {
+      const res = await service.getFriendProfile("user-uuid", "user-uuid");
+      expect(res.user.id).toBe("user-uuid");
+      expect(res.relationship).toBe("FRIENDS");
+    });
+
+    it("should throw ForbiddenException if stranger tries to view profile with no open request", async () => {
+      requestRepoMock.find.mockResolvedValue([
+        { id: "r-1", status: RequestStatus.FULFILLED, requester_id: "target-uuid" },
+      ]);
+      friendshipRepoMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getFriendProfile("user-uuid", "target-uuid"),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should allow stranger to view profile if user has an active OPEN blood request", async () => {
+      requestRepoMock.find.mockResolvedValue([
+        { id: "r-1", status: RequestStatus.OPEN, requester_id: "target-uuid" },
+      ]);
+      friendshipRepoMock.findOne.mockResolvedValue(null);
+
+      const res = await service.getFriendProfile("user-uuid", "target-uuid");
+      expect(res.user.id).toBe("target-uuid");
+      expect(res.user.phone).toBeNull(); // phone hidden from strangers
+    });
+
+    it("should allow friends to view profile with phone visible even without open requests", async () => {
+      requestRepoMock.find.mockResolvedValue([
+        { id: "r-1", status: RequestStatus.FULFILLED, requester_id: "target-uuid" },
+      ]);
+      friendshipRepoMock.findOne.mockResolvedValue({
+        id: "f-1",
+        requester_id: "user-uuid",
+        addressee_id: "target-uuid",
+        status: FriendshipStatus.ACCEPTED,
+      });
+
+      const res = await service.getFriendProfile("user-uuid", "target-uuid");
+      expect(res.user.id).toBe("target-uuid");
+      expect(res.relationship).toBe("FRIENDS");
+    });
+
+    it("should allow lifetime-connected donor/requester to view profile even without open requests", async () => {
+      requestRepoMock.find.mockResolvedValue([
+        { id: "r-1", status: RequestStatus.FULFILLED, requester_id: "target-uuid" },
+      ]);
+      friendshipRepoMock.findOne.mockResolvedValue(null);
+      responseRepoMock.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({ id: "resp-1" }),
+      });
+
+      const res = await service.getFriendProfile("user-uuid", "target-uuid");
+      expect(res.user.id).toBe("target-uuid");
+    });
+  });
+
+  describe("searchUsers", () => {
+    it("should return empty array when query is empty or whitespace", async () => {
+      const res = await service.searchUsers("user-uuid", "   ");
+      expect(res).toEqual([]);
+    });
+
+    it("should search exclusively by exact email or phone without name matching", async () => {
+      const qbMock = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: "target-1",
+            name: "John Target",
+            email: "target@example.com",
+            phone: "01978729783",
+            avatar_url: null,
+            role: "USER",
+          },
+        ]),
+      };
+      userRepoMock.createQueryBuilder.mockReturnValue(qbMock);
+      donorProfileRepoMock.find.mockResolvedValue([]);
+      friendshipRepoMock.find.mockResolvedValue([]);
+
+      const res = await service.searchUsers("user-uuid", "target@example.com");
+      expect(res.length).toBe(1);
+      expect(res[0].id).toBe("target-1");
+      expect(qbMock.andWhere).toHaveBeenCalledWith(
+        "LOWER(u.email) = LOWER(:email)",
+        { email: "target@example.com" },
+      );
+    });
+
+    it("should search by exact phone number with normalized candidates", async () => {
+      const qbMock = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: "target-1",
+            name: "John Target",
+            email: "target@example.com",
+            phone: "01978729783",
+            avatar_url: null,
+            role: "USER",
+          },
+        ]),
+      };
+      userRepoMock.createQueryBuilder.mockReturnValue(qbMock);
+      donorProfileRepoMock.find.mockResolvedValue([]);
+      friendshipRepoMock.find.mockResolvedValue([]);
+
+      const res = await service.searchUsers("user-uuid", "01978729783");
+      expect(res.length).toBe(1);
+      expect(res[0].id).toBe("target-1");
+      expect(res[0].email).toBe("target@example.com");
+      expect(res[0].phone).toBeNull(); // Phone is shielded from strangers in search results
+      expect(qbMock.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining("u.phone IN (:...phoneCandidates)"),
+        expect.objectContaining({
+          cleanedDigits: "01978729783",
+        }),
+      );
     });
   });
 });

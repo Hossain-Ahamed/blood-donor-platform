@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { Injectable, NotFoundException, Logger, Inject } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { BloodRequest } from "../../entities/request.entity";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { RequestStatus } from "@repo/shared";
+import { invalidateCacheKeys } from "../../common/utils/cache.util";
 
 @Injectable()
 export class AdminRequestsService {
@@ -13,6 +16,7 @@ export class AdminRequestsService {
     @InjectRepository(BloodRequest)
     private requestRepository: Repository<BloodRequest>,
     private auditLogsService: AuditLogsService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   async findAll(query: any) {
@@ -176,6 +180,10 @@ export class AdminRequestsService {
     const after = { ...request };
 
     await this.requestRepository.save(request);
+    await invalidateCacheKeys(this.cacheManager, [
+      `profile:user:${request.requester_id}`,
+      "admin:dashboard:stats",
+    ]);
 
     let action = "UPDATE_REQUEST";
     if (updateData.status) {
@@ -209,6 +217,10 @@ export class AdminRequestsService {
 
     const before = { ...request };
     await this.requestRepository.softDelete(id);
+    await invalidateCacheKeys(this.cacheManager, [
+      `profile:user:${request.requester_id}`,
+      "admin:dashboard:stats",
+    ]);
 
     try {
       await this.auditLogsService.record(

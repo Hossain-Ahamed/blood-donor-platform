@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Phone } from "lucide-react";
+import { Phone, PhoneOff } from "lucide-react";
 import {
   componentTypeLabels,
   requestStatusLabels,
@@ -10,11 +10,18 @@ import type { BloodRequest } from "@repo/shared";
 
 interface PatientMedicalDetailsCardProps {
   request: BloodRequest;
+  isOwnRequest?: boolean;
+  isAdmin?: boolean;
 }
 
 export function PatientMedicalDetailsCard({
   request,
+  isOwnRequest,
+  isAdmin,
 }: PatientMedicalDetailsCardProps) {
+  const isClosed =
+    request.status === "CANCELLED" || request.status === "FULFILLED";
+
   return (
     <Card>
       <CardHeader>
@@ -77,11 +84,11 @@ export function PatientMedicalDetailsCard({
             <p className="text-sm text-muted-foreground">Urgency Level</p>
             <div className="mt-1">
               {request.urgency === "CRITICAL" ? (
-                <Badge variant="destructive" className="font-bold text-xs bg-red-600">
+                <Badge variant="outline" className="text-red-600 font-semibold text-xs bg-transparent hover:bg-transparent hover:text-red-600 border-red-600">
                   Critical (Immediate)
                 </Badge>
               ) : request.urgency === "URGENT" ? (
-                <Badge className="font-bold text-xs bg-amber-600 text-white">
+                <Badge variant="outline" className="font-semibold text-xs border-blue-300 text-blue-700 dark:text-blue-400">
                   Urgent (Within 24h)
                 </Badge>
               ) : (
@@ -102,16 +109,28 @@ export function PatientMedicalDetailsCard({
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Patient / Attendant Contact</p>
-            {request.contact_phone ? (
-              <a
-                href={`tel:${request.contact_phone}`}
-                className="font-semibold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 mt-0.5"
-              >
-                <Phone className="w-3.5 h-3.5" />
-                {request.contact_phone}
-              </a>
+            {isClosed && !isOwnRequest && !isAdmin ? (
+              <p className="text-sm text-muted-foreground italic flex items-center gap-1.5 mt-0.5">
+                <PhoneOff className="w-3.5 h-3.5 text-muted-foreground" />
+                Hidden (Request {request.status === "FULFILLED" ? "fulfilled" : "cancelled"})
+              </p>
+            ) : request.contact_phone ? (
+              <div className="space-y-0.5 mt-0.5">
+                <a
+                  href={`tel:${request.contact_phone}`}
+                  className="font-semibold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>{request.contact_phone}</span>
+                </a>
+                {isClosed && (isOwnRequest || isAdmin) && (
+                  <span className="text-[10px] text-muted-foreground block">
+                    (Visible only to you & admin - {request.status === "FULFILLED" ? "Fulfilled" : "Cancelled"})
+                  </span>
+                )}
+              </div>
             ) : (
-              <p className="font-medium">Not provided</p>
+              <p className="font-medium text-sm text-muted-foreground italic">Not provided</p>
             )}
           </div>
         </div>

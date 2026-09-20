@@ -57,8 +57,8 @@ export class RequestsController {
 
   @Public()
   @Get(":id")
-  async findOne(@Param("id") id: string) {
-    return this.requestsService.findOne(id);
+  async findOne(@Param("id") id: string, @CurrentUser() user?: any) {
+    return this.requestsService.findOne(id, user);
   }
 
   @Patch(":id")
