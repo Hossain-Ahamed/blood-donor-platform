@@ -27,8 +27,10 @@ import {
 import {
   getOrSetWithStampedeProtection,
   invalidateCacheKeys,
+  invalidateCachePattern,
 } from "../../common/utils/cache.util";
 import { SendFriendRequestDto } from "./dto/send-friend-request.dto";
+import { GetFriendsQueryDto } from "./dto/get-friends-query.dto";
 
 @Injectable()
 export class FriendsService {
@@ -302,67 +304,104 @@ export class FriendsService {
   }
 
   /**
-   * Gets list of accepted friends with donor profiles, cached in Redis.
+   * Gets paginated list of accepted friends with donor profiles, optimized for infinite scroll.
+   * Single indexed query with LIMIT (limit + 1) OFFSET skip, protected with Stampede Redis Cache.
    */
-  async getFriends(userId: string): Promise<FriendUser[]> {
-    const cacheKey = `friends:list:${userId}`;
+  async getFriends(
+    userId: string,
+    query?: GetFriendsQueryDto,
+  ): Promise<{
+    data: FriendUser[];
+    meta: { page: number; limit: number; hasMore: boolean };
+  }> {
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(query?.limit) || 10));
+    const search = query?.search?.trim();
+    const bloodGroup = query?.blood_group?.trim();
+    const skip = (page - 1) * limit;
 
-    return getOrSetWithStampedeProtection<FriendUser[]>(
+    const cacheKey = `friends:list:${userId}:p${page}:l${limit}:s_${search || ""}:bg_${bloodGroup || "all"}`;
+
+    return getOrSetWithStampedeProtection(
       this.cacheManager,
       cacheKey,
       async () => {
-        const friendships = await this.friendshipRepo
+        const qb = this.friendshipRepo
           .createQueryBuilder("f")
-          .innerJoinAndSelect("f.requester", "req")
-          .innerJoinAndSelect("f.addressee", "addr")
+          .innerJoin(
+            User,
+            "u",
+            "u.id = CASE WHEN f.requester_id = :userId THEN f.addressee_id ELSE f.requester_id END",
+            { userId },
+          )
+          .leftJoin(DonorProfile, "p", "p.user_id = u.id")
+          .select([
+            "f.id AS friendship_id",
+            "f.updated_at AS friend_since",
+            "u.id AS id",
+            "u.name AS name",
+            "u.email AS email",
+            "u.avatar_url AS avatar_url",
+            "u.phone AS phone",
+            "p.blood_group AS blood_group",
+            "p.area_name AS area_name",
+            "p.is_available AS is_available",
+            "p.last_donation_date AS last_donation_date",
+          ])
           .where("(f.requester_id = :userId OR f.addressee_id = :userId)", {
             userId,
           })
           .andWhere("f.status = :status", {
             status: FriendshipStatus.ACCEPTED,
-          })
-          .orderBy("f.updated_at", "DESC")
-          .getMany();
+          });
 
-        if (friendships.length === 0) {
-          return [];
+        if (search) {
+          qb.andWhere(
+            "(u.name ILIKE :search OR u.email ILIKE :search OR u.phone ILIKE :search)",
+            { search: `%${search}%` },
+          );
         }
 
-        const friendUserIds = friendships.map((f) =>
-          f.requester_id === userId ? f.addressee_id : f.requester_id,
-        );
-
-        const profiles = await this.donorProfileRepo.find({
-          where: { user_id: In(friendUserIds) },
-        });
-
-        const profileMap = new Map<string, DonorProfile>();
-        for (const p of profiles) {
-          profileMap.set(p.user_id, p);
+        if (bloodGroup && bloodGroup !== "all") {
+          qb.andWhere("p.blood_group = :bloodGroup", { bloodGroup });
         }
 
-        return friendships.map((f) => {
-          const isRequester = f.requester_id === userId;
-          const friend = isRequester ? f.addressee : f.requester;
-          const profile = profileMap.get(friend.id);
+        qb.orderBy("f.updated_at", "DESC")
+          .offset(skip)
+          .limit(limit + 1);
 
-          return {
-            id: friend.id,
-            name: friend.name,
-            email: friend.email,
-            avatar_url: friend.avatar_url,
-            phone: friend.phone,
-            blood_group: profile?.blood_group || null,
-            area_name: profile?.area_name || null,
-            is_available: profile?.is_available ?? null,
-            last_donation_date: profile?.last_donation_date || null,
-            friendship_id: f.id,
-            friendship_status: "FRIENDS" as FriendshipRelationStatus,
-            friend_since: f.updated_at,
-          };
-        });
+        const rawResults = await qb.getRawMany();
+        const hasMore = rawResults.length > limit;
+        const pageItems = rawResults.slice(0, limit);
+
+        const data: FriendUser[] = pageItems.map((r) => ({
+          id: r.id,
+          name: r.name,
+          email: r.email,
+          avatar_url: r.avatar_url,
+          phone: r.phone,
+          blood_group: r.blood_group || null,
+          area_name: r.area_name || null,
+          is_available:
+            r.is_available !== null && r.is_available !== undefined
+              ? Boolean(r.is_available)
+              : null,
+          last_donation_date: r.last_donation_date || null,
+          friendship_id: r.friendship_id,
+          friendship_status: "FRIENDS" as FriendshipRelationStatus,
+          friend_since: r.friend_since,
+        }));
+
+        return {
+          data,
+          meta: {
+            page,
+            limit,
+            hasMore,
+          },
+        };
       },
-      600000, // 10 minutes TTL
+      60000, // 1 minute cache with Stampede protection
     );
   }
 
@@ -729,6 +768,8 @@ export class FriendsService {
 
     await invalidateCacheKeys(this.cacheManager, keys);
     await Promise.allSettled([
+      invalidateCachePattern(this.cacheManager, `friends:list:${userA}*`),
+      invalidateCachePattern(this.cacheManager, `friends:list:${userB}*`),
       this.smartFeedService.invalidateFeedCache(userA),
       this.smartFeedService.invalidateFeedCache(userB),
     ]);

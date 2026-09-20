@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -17,6 +17,8 @@ import {
   Calendar,
   Phone,
   Shield,
+  X,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FriendActionButton } from "@/components/friends/FriendActionButton";
 import { apiClient } from "@/lib/api/client";
 import { formatBloodGroup, FriendUser, BloodGroup } from "@repo/shared";
@@ -31,6 +40,7 @@ import { toast } from "sonner";
 
 interface FriendsClientProps {
   initialFriends: FriendUser[];
+  initialHasMore?: boolean;
   initialRequests: {
     received: FriendUser[];
     sent: FriendUser[];
@@ -39,32 +49,205 @@ interface FriendsClientProps {
 
 export function FriendsClient({
   initialFriends,
+  initialHasMore = false,
   initialRequests,
 }: FriendsClientProps) {
-  const [friends, setFriends] = useState<FriendUser[]>(initialFriends);
-  const [requests, setRequests] = useState(initialRequests);
-  const [activeTab, setActiveTab] = useState("my-friends");
+  // Friends search & blood group filter state
+  const [nameSearch, setNameSearch] = useState("");
+  const [debouncedNameSearch, setDebouncedNameSearch] = useState("");
+  const [bloodGroupFilter, setBloodGroupFilter] = useState<string>("all");
 
-  // Search by Email state
+  // Infinite scroll pagination state
+  const [friends, setFriends] = useState<FriendUser[]>(initialFriends);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Find friends (search by email/name) tab state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FriendUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  const [requests, setRequests] = useState(initialRequests);
+  const [activeTab, setActiveTab] = useState("my-friends");
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const isInitialMount = useRef(true);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNameSearch(nameSearch);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [nameSearch]);
+
+  // Backend search on debounced filter change
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    let isSubscribed = true;
+    const fetchFilteredFriends = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "10",
+        });
+        if (debouncedNameSearch.trim()) {
+          params.append("search", debouncedNameSearch.trim());
+        }
+        if (bloodGroupFilter !== "all") {
+          params.append("blood_group", bloodGroupFilter);
+        }
+
+        const res = await apiClient.request<
+          | { data: FriendUser[]; meta?: { page: number; limit: number; hasMore: boolean } }
+          | FriendUser[]
+        >(`/friends?${params.toString()}`);
+
+        if (!isSubscribed) return;
+
+        let items: FriendUser[] = [];
+        let more = false;
+        if (Array.isArray(res)) {
+          items = res;
+          more = res.length >= 10;
+        } else if (res && Array.isArray((res as any).data)) {
+          items = (res as any).data;
+          more = Boolean((res as any).meta?.hasMore);
+        }
+
+        setFriends(items);
+        setPage(1);
+        setHasMore(more);
+      } catch (err: any) {
+        if (isSubscribed) {
+          toast.error(err?.message || "Failed to search friends");
+        }
+      } finally {
+        if (isSubscribed) setIsLoading(false);
+      }
+    };
+
+    fetchFilteredFriends();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [debouncedNameSearch, bloodGroupFilter]);
+
+  // Scroll to load more (infinite scroll)
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || isLoading || !hasMore) return;
+
+    setIsLoadingMore(true);
+    const nextPage = page + 1;
+
+    try {
+      const params = new URLSearchParams({
+        page: nextPage.toString(),
+        limit: "10",
+      });
+      if (debouncedNameSearch.trim()) {
+        params.append("search", debouncedNameSearch.trim());
+      }
+      if (bloodGroupFilter !== "all") {
+        params.append("blood_group", bloodGroupFilter);
+      }
+
+      const res = await apiClient.request<
+        | { data: FriendUser[]; meta?: { page: number; limit: number; hasMore: boolean } }
+        | FriendUser[]
+      >(`/friends?${params.toString()}`);
+
+      let items: FriendUser[] = [];
+      let more = false;
+      if (Array.isArray(res)) {
+        items = res;
+        more = res.length >= 10;
+      } else if (res && Array.isArray((res as any).data)) {
+        items = (res as any).data;
+        more = Boolean((res as any).meta?.hasMore);
+      }
+
+      setFriends((prev) => {
+        const existingIds = new Set(prev.map((f) => f.id));
+        const newUnique = items.filter((f) => !existingIds.has(f.id));
+        return [...prev, ...newUnique];
+      });
+      setPage(nextPage);
+      setHasMore(more);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load more friends");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, isLoading, hasMore, page, debouncedNameSearch, bloodGroupFilter]);
+
+  // IntersectionObserver for infinite scroll sentinel
+  useEffect(() => {
+    if (!hasMore || isLoading || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: "250px" },
+    );
+
+    const el = sentinelRef.current;
+    if (el) observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, [hasMore, isLoading, isLoadingMore, loadMore]);
+
   const refreshData = useCallback(async () => {
     try {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "10",
+      });
+      if (debouncedNameSearch.trim()) {
+        params.append("search", debouncedNameSearch.trim());
+      }
+      if (bloodGroupFilter !== "all") {
+        params.append("blood_group", bloodGroupFilter);
+      }
+
       const [friendsRes, reqRes] = await Promise.all([
-        apiClient.request<FriendUser[]>("/friends"),
+        apiClient.request<
+          | { data: FriendUser[]; meta?: { page: number; limit: number; hasMore: boolean } }
+          | FriendUser[]
+        >(`/friends?${params.toString()}`),
         apiClient.request<{ received: FriendUser[]; sent: FriendUser[] }>(
           "/friends/requests",
         ),
       ]);
-      if (Array.isArray(friendsRes)) setFriends(friendsRes);
+
+      if (Array.isArray(friendsRes)) {
+        setFriends(friendsRes);
+        setHasMore(friendsRes.length >= 10);
+      } else if (friendsRes && Array.isArray((friendsRes as any).data)) {
+        setFriends((friendsRes as any).data);
+        setHasMore(Boolean((friendsRes as any).meta?.hasMore));
+      }
+      setPage(1);
+
       if (reqRes && Array.isArray(reqRes.received)) setRequests(reqRes);
     } catch {
       // offline / quiet catch
     }
-  }, []);
+  }, [debouncedNameSearch, bloodGroupFilter]);
 
   // Search handler
   const handleSearch = async (e?: React.FormEvent) => {
@@ -168,7 +351,70 @@ export function FriendsClient({
 
         {/* Tab 1: My Friends */}
         <TabsContent value="my-friends" className="space-y-4">
-          {friends.length === 0 ? (
+          {/* Search & Blood Group Filter Bar */}
+          <div className="bg-card p-3 sm:p-4 rounded-xl border shadow-xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+              {/* Search Input */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search friends by name, email, or phone..."
+                  value={nameSearch}
+                  onChange={(e) => setNameSearch(e.target.value)}
+                  className="pl-9 pr-8 h-9 text-xs sm:text-sm"
+                />
+                {nameSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setNameSearch("")}
+                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                    title="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Blood Group Select */}
+              <Select
+                value={bloodGroupFilter}
+                onValueChange={(val: string | null) => setBloodGroupFilter(val || "all")}
+              >
+                <SelectTrigger className="h-9 w-full sm:w-[170px] text-xs sm:text-sm">
+                  <SelectValue placeholder="All Blood Groups" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Blood Groups</SelectItem>
+                  <SelectItem value="A_POS">A+ (A Positive)</SelectItem>
+                  <SelectItem value="A_NEG">A- (A Negative)</SelectItem>
+                  <SelectItem value="B_POS">B+ (B Positive)</SelectItem>
+                  <SelectItem value="B_NEG">B- (B Negative)</SelectItem>
+                  <SelectItem value="AB_POS">AB+ (AB Positive)</SelectItem>
+                  <SelectItem value="AB_NEG">AB- (AB Negative)</SelectItem>
+                  <SelectItem value="O_POS">O+ (O Positive)</SelectItem>
+                  <SelectItem value="O_NEG">O- (O Negative)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(nameSearch || bloodGroupFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setNameSearch("");
+                    setBloodGroupFilter("all");
+                  }}
+                  className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Reset
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* List-Wise Table */}
+          {friends.length === 0 && !nameSearch && bloodGroupFilter === "all" && !isLoading ? (
             <Card className="border-dashed border-2 p-8 text-center bg-card/50">
               <div className="max-w-md mx-auto space-y-3">
                 <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center">
@@ -191,93 +437,152 @@ export function FriendsClient({
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {friends.map((friend) => {
-                const initials = friend.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase();
-
-                return (
-                  <Card
-                    key={friend.id}
-                    className="border bg-card hover:shadow-md transition-all group overflow-hidden"
+            <div className="space-y-4">
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div
+                    key={n}
+                    className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border bg-card animate-pulse gap-3"
                   >
-                    <CardContent className="p-5 space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12 border-2 border-red-100 dark:border-red-950/60 shrink-0">
-                            <AvatarImage
-                              src={friend.avatar_url || undefined}
-                              alt={friend.name}
-                            />
-                            <AvatarFallback className="font-bold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400">
-                              {initials || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="space-y-0.5">
-                            <h4 className="font-bold text-sm sm:text-base leading-tight group-hover:text-red-600 transition-colors">
-                              {friend.name}
-                            </h4>
-                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                              {friend.email}
-                            </p>
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                      <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl bg-muted shrink-0" />
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 bg-muted rounded-md w-3/4" />
+                        <div className="h-5 bg-muted rounded-full w-16" />
+                      </div>
+                    </div>
+                    <div className="h-8 w-20 bg-muted rounded-lg shrink-0" />
+                  </div>
+                ))}
+              </div>
+            ) : friends.length === 0 ? (
+              <Card className="p-8 text-center border-dashed bg-card/50">
+                <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs py-4">
+                  <Users className="w-8 h-8 text-muted-foreground/40" />
+                  <span className="font-semibold text-foreground text-sm">
+                    No friends found
+                  </span>
+                  <span className="text-xs text-muted-foreground max-w-sm">
+                    No donors match your search and blood group filters.
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setNameSearch("");
+                      setBloodGroupFilter("all");
+                    }}
+                    className="mt-2 text-xs"
+                  >
+                    Reset Filters
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {friends.map((friend) => {
+                  const initials = friend.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
+
+                  return (
+                    <div
+                      key={friend.id}
+                      className="group relative flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border bg-card hover:bg-muted/40 transition-all duration-150 shadow-2xs hover:shadow-xs gap-3"
+                    >
+                      {/* Clickable Profile Area (Image + Name + Blood Group) */}
+                      <Link
+                        href={`/friends/${friend.id}`}
+                        className="flex items-center gap-3.5 min-w-0 flex-1 group/profile"
+                      >
+                        <Avatar className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl border shrink-0 shadow-2xs overflow-hidden">
+                          <AvatarImage
+                            src={friend.avatar_url || undefined}
+                            alt={friend.name}
+                            className="object-cover rounded-xl"
+                          />
+                          <AvatarFallback className="font-bold text-base sm:text-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 rounded-xl">
+                            {initials || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="font-bold text-sm sm:text-base text-foreground group-hover/profile:text-red-600 group-hover/profile:underline transition-colors truncate">
+                            {friend.name}
+                          </p>
+                          <div>
+                            {friend.blood_group ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border border-red-200/80 dark:border-red-900/60 px-2.5 py-0.5 rounded-full">
+                                <Droplet className="w-3 h-3 fill-red-500 text-red-500" />
+                                {formatBloodGroup(friend.blood_group)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/60 italic">
+                                Unknown
+                              </span>
+                            )}
                           </div>
                         </div>
+                      </Link>
 
-                        {friend.blood_group && (
-                          <Badge className="bg-red-600 text-white font-extrabold px-2 py-0.5 shrink-0 shadow-sm">
-                            {formatBloodGroup(friend.blood_group)}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5 text-xs text-muted-foreground pt-1 border-t border-border/50">
-                        {friend.area_name && (
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                            <span className="truncate">{friend.area_name}</span>
-                          </div>
-                        )}
-                        {friend.is_available !== null && (
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`w-2 h-2 rounded-full ${friend.is_available ? "bg-emerald-500" : "bg-amber-500"}`}
-                            />
-                            <span>
-                              {friend.is_available
-                                ? "Available to donate"
-                                : "In cooldown period"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="pt-2 flex items-center justify-between gap-2 border-t border-border/50">
-                        <Link
-                          href={`/friends/${friend.id}`}
-                          className="text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-1 transition-colors"
-                        >
-                          View Profile & History
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
-
+                      {/* Simple Friend / Unfriend Button */}
+                      <div
+                        className="shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <FriendActionButton
                           targetUserId={friend.id}
+                          targetUserName={friend.name}
                           initialStatus="FRIENDS"
                           initialFriendshipId={friend.friendship_id}
-                          onStatusChange={refreshData}
+                          onStatusChange={(newStatus) => {
+                            if (newStatus !== "FRIENDS") {
+                              setFriends((prev) =>
+                                prev.filter((f) => f.id !== friend.id),
+                              );
+                            }
+                          }}
                           size="sm"
+                          simple={true}
                         />
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Scroll Sentinel for Facebook-style Infinite Scroll */}
+            <div
+              ref={sentinelRef}
+              className="py-5 flex items-center justify-center min-h-[50px]"
+            >
+              {isLoadingMore ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                  <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+                  <span>Loading more friends...</span>
+                </div>
+              ) : hasMore ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadMore}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Load more friends
+                </Button>
+              ) : friends.length > 10 ? (
+                <span className="text-xs text-muted-foreground/70">
+                  You&apos;ve reached the end of your friends list
+                </span>
+              ) : null}
             </div>
+          </div>
           )}
         </TabsContent>
 

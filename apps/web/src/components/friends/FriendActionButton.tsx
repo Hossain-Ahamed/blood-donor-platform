@@ -33,19 +33,23 @@ import { cn } from "@/lib/utils";
 
 interface FriendActionButtonProps {
   targetUserId: string;
+  targetUserName?: string;
   initialStatus?: FriendshipRelationStatus;
   initialFriendshipId?: string;
   size?: "sm" | "default" | "lg" | "icon";
   className?: string;
+  simple?: boolean;
   onStatusChange?: (newStatus: FriendshipRelationStatus) => void;
 }
 
 export function FriendActionButton({
   targetUserId,
+  targetUserName,
   initialStatus,
   initialFriendshipId,
   size = "sm",
   className,
+  simple = false,
   onStatusChange,
 }: FriendActionButtonProps) {
   const [status, setStatus] = useState<FriendshipRelationStatus | null>(
@@ -184,6 +188,74 @@ export function FriendActionButton({
   };
 
   if (status === "FRIENDS") {
+    if (simple) {
+      return (
+        <>
+          <Button
+            variant="outline"
+            size={size as any}
+            className={cn(
+              "h-8 px-3 text-xs font-medium border-muted-foreground/20 text-muted-foreground hover:text-red-600 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-950/30 gap-1.5 transition-colors cursor-pointer shrink-0 rounded-lg",
+              className,
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setIsConfirmingUnfriend(true);
+            }}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <UserX className="w-3.5 h-3.5" />
+            )}
+            <span>Unfriend</span>
+          </Button>
+
+          <Dialog
+            open={isConfirmingUnfriend}
+            onOpenChange={setIsConfirmingUnfriend}
+          >
+            <DialogContent
+              className="sm:max-w-xs p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="text-base font-bold">
+                  {targetUserName ? `Unfriend ${targetUserName}?` : "Unfriend user?"}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Are you sure you want to remove this friend?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex-row justify-end gap-2 pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsConfirmingUnfriend(false)}
+                  disabled={loading}
+                  className="text-xs h-8"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUnfriend}
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs h-8 px-3"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  ) : null}
+                  Unfriend
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+
     return (
       <>
         <DropdownMenu>
@@ -252,6 +324,32 @@ export function FriendActionButton({
   }
 
   if (status === "PENDING_SENT") {
+    if (simple) {
+      return (
+        <Button
+          variant="outline"
+          size={size as any}
+          className={cn(
+            "h-8 px-3 text-xs font-medium border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 gap-1.5 transition-colors cursor-pointer shrink-0 rounded-lg",
+            className,
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            handleCancelRequest();
+          }}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          )}
+          <span>Requested</span>
+        </Button>
+      );
+    }
+
     return (
       <DropdownMenu>
         <DropdownMenuTrigger

@@ -157,12 +157,20 @@ export default function AdminAuditLogsPage() {
       const res = await apiClient.request<PaginatedAuditResponse>(
         `/admin/audit-logs?${params.toString()}`,
       );
-      const json = (res as any).data?.data ? (res as any).data : res;
+      const responseData = (res as any)?.data?.data ? (res as any).data : res;
+      const logs = Array.isArray(responseData)
+        ? responseData
+        : Array.isArray(responseData?.data)
+          ? responseData.data
+          : [];
+      const meta = responseData?.meta ?? (res as any)?.meta;
+      const totalCount = Number(meta?.total ?? logs.length);
+      const totalPages = Number((meta?.totalPages ?? Math.ceil(totalCount / limit)) || 1);
 
       return {
-        logs: (json.data || []) as EnrichedAuditLog[],
-        totalPages: (json.meta?.totalPages || 1) as number,
-        totalCount: (json.meta?.total || 0) as number,
+        logs: logs as EnrichedAuditLog[],
+        totalPages,
+        totalCount,
       };
     },
   });
@@ -583,41 +591,66 @@ export default function AdminAuditLogsPage() {
       </div>
 
       {/* Pagination Bar */}
-      {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground py-2">
-          <div>
-            Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalCount)} of {totalCount} logs
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground py-2 border-t pt-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span>Rows per page:</span>
+            <Select
+              value={limit.toString()}
+              onValueChange={(val: string | null) => {
+                if (val) {
+                  setLimit(Number(val));
+                  setPage(1);
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 w-[72px] text-xs">
+                <SelectValue placeholder={limit.toString()} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="15">15</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || loading}
-              className="h-8 text-xs gap-1"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>Previous</span>
-            </Button>
-
-            <span className="font-medium px-2 text-foreground">
-              Page {page} of {totalPages}
-            </span>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages || loading}
-              className="h-8 text-xs gap-1"
-            >
-              <span>Next</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Button>
+          <div>
+            Showing {totalCount > 0 ? (page - 1) * limit + 1 : 0} to{" "}
+            {Math.min(page * limit, totalCount)} of {totalCount} logs
           </div>
         </div>
-      )}
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            className="h-8 text-xs gap-1"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Previous</span>
+          </Button>
+
+          <span className="font-medium px-2 text-foreground">
+            Page {page} of {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+            className="h-8 text-xs gap-1"
+          >
+            <span>Next</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
 
       {/* Changeset / Meta Inspector Modal */}
       <Dialog

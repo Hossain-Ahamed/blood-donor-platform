@@ -179,31 +179,29 @@ export function AdminRequestsTable({
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(Math.max(1, page - 1))}
-            disabled={page === 1 || loading}
-            className="h-8 text-xs"
-          >
-            Previous
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages || loading}
-            className="h-8 text-xs"
-          >
-            Next
-          </Button>
-        </div>
-      )}
+      <div className="flex items-center justify-between px-2 py-2 border-t mt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1 || loading}
+          className="h-8 text-xs"
+        >
+          Previous
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Page {page} of {totalPages || 1}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= (totalPages || 1) || loading}
+          className="h-8 text-xs"
+        >
+          Next
+        </Button>
+      </div>
     </div>
   );
 }

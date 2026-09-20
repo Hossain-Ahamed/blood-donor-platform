@@ -10,6 +10,7 @@ import { HeartHandshake, CheckCircle2 } from "lucide-react";
 import { HistoryRequestCard, type BloodRequestItem } from "./HistoryRequestCard";
 import { HistoryApplicationCard, type AppliedResponseItem } from "./HistoryApplicationCard";
 import { HistoryDonationCard, type DonationItem } from "./HistoryDonationCard";
+import { HistoryPaginatedSection } from "./HistoryPaginatedSection";
 
 async function confirmDonationAction(formData: FormData) {
   "use server";
@@ -112,23 +113,29 @@ export default async function HistoryPage() {
         </TabsList>
 
         <TabsContent value="requests" className="mt-6 space-y-4">
-          {requests.length === 0 ? (
-            <Card className="bg-muted/30 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
-                <p>You haven&apos;t made any blood requests yet.</p>
-                <Link href="/requests/new" className="mt-4">
-                  <Button
-                    size="sm"
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    Create a Blood Request
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            requests.map((r) => <HistoryRequestCard key={r.id} request={r} />)
-          )}
+          <HistoryPaginatedSection
+            items={requests}
+            itemKey={(r) => r.id}
+            itemLabel="requests"
+            pageSizeOptions={[5, 10, 20]}
+            defaultPageSize={5}
+            emptyState={
+              <Card className="bg-muted/30 border-dashed">
+                <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+                  <p>You haven&apos;t made any blood requests yet.</p>
+                  <Link href="/requests/new" className="mt-4">
+                    <Button
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Create a Blood Request
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            }
+            renderItem={(r) => <HistoryRequestCard request={r} />}
+          />
         </TabsContent>
 
         <TabsContent value="donations" className="mt-6 space-y-6">
@@ -167,15 +174,19 @@ export default async function HistoryPage() {
                     </span>
                   </div>
 
-                  <div className="space-y-3">
-                    {appliedResponses.map((item) => (
+                  <HistoryPaginatedSection
+                    items={appliedResponses}
+                    itemKey={(item) => item.id}
+                    itemLabel="donation offers"
+                    pageSizeOptions={[5, 10, 20]}
+                    defaultPageSize={5}
+                    renderItem={(item) => (
                       <HistoryApplicationCard
-                        key={item.id}
                         item={item}
                         confirmDonationAction={confirmDonationAction}
                       />
-                    ))}
-                  </div>
+                    )}
+                  />
                 </div>
               )}
 
@@ -186,15 +197,19 @@ export default async function HistoryPage() {
                     Confirmed Blood Donations ({donations.length})
                   </h3>
 
-                  <div className="space-y-3">
-                    {donations.map((d) => (
+                  <HistoryPaginatedSection
+                    items={donations}
+                    itemKey={(d) => d.id}
+                    itemLabel="donations"
+                    pageSizeOptions={[5, 10, 20]}
+                    defaultPageSize={5}
+                    renderItem={(d) => (
                       <HistoryDonationCard
-                        key={d.id}
                         donation={d}
                         confirmDonationAction={confirmDonationAction}
                       />
-                    ))}
-                  </div>
+                    )}
+                  />
                 </div>
               )}
             </>

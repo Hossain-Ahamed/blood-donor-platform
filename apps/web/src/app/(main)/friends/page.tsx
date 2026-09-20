@@ -19,12 +19,16 @@ export default async function FriendsPage() {
   }
 
   let initialFriends: FriendUser[] = [];
+  let initialHasMore = false;
   let initialRequests = { received: [] as FriendUser[], sent: [] as FriendUser[] };
   let shouldRedirectToLogin = false;
 
   try {
     const [friendsRes, requestsRes] = await Promise.allSettled([
-      apiServer.request<FriendUser[]>("/friends"),
+      apiServer.request<
+        | { data: FriendUser[]; meta?: { page: number; limit: number; hasMore: boolean } }
+        | FriendUser[]
+      >("/friends?page=1&limit=10"),
       apiServer.request<{ received: FriendUser[]; sent: FriendUser[] }>(
         "/friends/requests",
       ),
@@ -38,8 +42,15 @@ export default async function FriendsPage() {
       shouldRedirectToLogin = true;
     }
 
-    if (friendsRes.status === "fulfilled" && Array.isArray(friendsRes.value)) {
-      initialFriends = friendsRes.value;
+    if (friendsRes.status === "fulfilled") {
+      const val = friendsRes.value;
+      if (Array.isArray(val)) {
+        initialFriends = val;
+        initialHasMore = val.length >= 10;
+      } else if (val && Array.isArray((val as any).data)) {
+        initialFriends = (val as any).data;
+        initialHasMore = Boolean((val as any).meta?.hasMore);
+      }
     }
 
     if (
@@ -61,6 +72,7 @@ export default async function FriendsPage() {
     <div className="container max-w-6xl mx-auto py-6 sm:py-8 px-4">
       <FriendsClient
         initialFriends={initialFriends}
+        initialHasMore={initialHasMore}
         initialRequests={initialRequests}
       />
     </div>
