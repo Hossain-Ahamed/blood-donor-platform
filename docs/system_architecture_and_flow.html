@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blood Aid — System Architecture, Function Flow & Route Catalog</title>
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --bg-card: #111827;
+      --bg-card-hover: #1f2937;
+      --border-color: #374151;
+      --primary: #ef4444;
+      --primary-hover: #dc2626;
+      --primary-light: rgba(239, 68, 68, 0.15);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent-blue: #38bdf8;
+      --accent-green: #34d399;
+      --accent-purple: #c084fc;
+      --accent-amber: #fbbf24;
+      --radius: 10px;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+
+    header {
+      background: linear-gradient(180deg, rgba(239, 68, 68, 0.12) 0%, rgba(17, 24, 39, 0.9) 100%);
+      border-bottom: 1px solid var(--border-color);
+      padding: 32px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+    }
+
+    .header-container {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      background: var(--primary);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 22px;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+    }
+
+    .brand-title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-title p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .view-toggles {
+      display: flex;
+      background: #1f2937;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      gap: 4px;
+    }
+
+    .view-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .view-btn.active {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      max-width: 1300px;
+      margin: 20px auto 0;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 0 24px;
+    }
+
+    .tab-link {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: var(--radius);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .tab-link:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+    }
+
+    .tab-link.active {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* Container */
+    .main-container {
+      max-width: 1300px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Grids */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-main);
+    }
+
+    .card h3 {
+      font-size: 16px;
+      margin: 16px 0 8px 0;
+      color: var(--accent-blue);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 20px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-get { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-post { background: rgba(52, 211, 153, 0.15); color: var(--accent-green); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .badge-patch { background: rgba(251, 191, 36, 0.15); color: var(--accent-amber); border: 1px solid rgba(251, 191, 36, 0.3); }
+    .badge-delete { background: rgba(239, 68, 68, 0.15); color: var(--primary); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-auth { background: #374151; color: #d1d5db; font-size: 10px; }
+    .badge-admin { background: rgba(192, 132, 252, 0.15); color: var(--accent-purple); border: 1px solid rgba(192, 132, 252, 0.3); }
+
+    /* Interactive Search */
+    .search-box {
+      width: 100%;
+      padding: 14px 18px;
+      background: #1f2937;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      color: white;
+      font-size: 15px;
+      margin-bottom: 20px;
+      transition: all 0.2s;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+    }
+
+    /* Flow Diagrams */
+    .flow-step-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      margin: 20px 0;
+    }
+
+    .flow-step {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      transition: transform 0.2s;
+    }
+
+    .flow-step:hover {
+      transform: translateX(4px);
+      background: #243248;
+    }
+
+    .step-number {
+      background: var(--primary);
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .step-content h4 {
+      font-size: 15px;
+      margin-bottom: 4px;
+      color: white;
+    }
+
+    .step-content p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .step-code {
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      background: #0f172a;
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: var(--accent-blue);
+      display: inline-block;
+    }
+
+    /* Function Table */
+    .table-responsive {
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      background: #1f2937;
+      color: #9ca3af;
+      padding: 12px 16px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #1f2937;
+      color: #d1d5db;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #f87171;
+    }
+
+    .filter-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .filter-tag {
+      background: #1f2937;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-tag.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    /* Non-tech journey cards */
+    .journey-card {
+      background: #1a2234;
+      border: 1px solid #2d3748;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .journey-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .journey-icon {
+      font-size: 24px;
+    }
+
+    .journey-header h3 {
+      margin: 0;
+      color: white;
+      font-size: 16px;
+    }
+
+    .journey-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .journey-list li {
+      position: relative;
+      padding-left: 24px;
+      margin-bottom: 10px;
+      font-size: 13.5px;
+      color: #cbd5e1;
+    }
+
+    .journey-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">🩸</div>
+        <div class="brand-title">
+          <h1>Blood Aid — Interactive Architecture & Flow Portal</h1>
+          <p>Full-Stack Monorepo Guide • Route Documentation • Function Call Hierarchy</p>
+        </div>
+      </div>
+
+      <div class="view-toggles">
+        <button class="view-btn active" onclick="switchPerspective('all')">Universal View</button>
+        <button class="view-btn" onclick="switchPerspective('non-tech')">User / Non-Technical</button>
+        <button class="view-btn" onclick="switchPerspective('tech')">Developer Deep Dive</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs-nav">
+    <button class="tab-link active" onclick="switchTab('overview')">1. Architecture Overview</button>
+    <button class="tab-link" onclick="switchTab('user-perspective')">2. User Perspective & Capabilities</button>
+    <button class="tab-link" onclick="switchTab('feature-flows')">3. End-to-End Feature Flows</button>
+    <button class="tab-link" onclick="switchTab('frontend-map')">4. Frontend Pages & Components</button>
+    <button class="tab-link" onclick="switchTab('backend-functions')">5. Backend Functions by Module</button>
+    <button class="tab-link" onclick="switchTab('routes-catalog')">6. Complete API Routes Catalog</button>
+  </nav>
+
+  <main class="main-container">
+
+    <!-- TAB 1: ARCHITECTURE OVERVIEW -->
+    <section id="overview" class="tab-content active">
+      <div class="card">
+        <h2>🏗️ High-Level System Architecture</h2>
+        <p style="color: var(--text-muted); margin-bottom: 20px;">
+          The Blood Aid platform is structured as a TypeScript monorepo using <strong>pnpm workspaces</strong>. 
+          It cleanly decouples the user-facing web application, the backend domain micro-services/modules, and shared contract models.
+        </p>
+
+        <div class="grid-3">
+          <div class="card" style="margin-bottom: 0; background: #162032; border-color: #2e3d54;">
+            <h3 style="color: var(--accent-blue);">Frontend Layer (`apps/web`)</h3>
+            <p style="font-size: 13px; color: #94a3b8;">
+              • Next.js 15 App Router & React 19<br>
+              • Server Components for SEO & fast initial loads<br>
+              • Client Components for real-time interactivity<br>
+              • Next.js API Proxy (`/api/proxy/[...path]`) injects HttpOnly JWT cookies securely<br>
+              • TanStack Query for client-side caching & mutations
+            </p>
+          </div>
+
+          <div class="card" style="margin-bottom: 0; background: #162032; border-color: #2e3d54;">
+            <h3 style="color: var(--accent-green);">API Gateway & Backend (`apps/api`)</h3>
+            <p style="font-size: 13px; color: #94a3b8;">
+              • NestJS 10 with modular dependency injection<br>
+              • TypeORM with PostgreSQL<br>
+              • PostGIS spatial queries (ST_DistanceSphere, ST_MakePoint)<br>
+              • Redis with Cache Stampede protection (Single-flight mutex & jittered TTL)<br>
+              • WebPush integration for instant donor emergency alerts
+            </p>
+          </div>
+
+          <div class="card" style="margin-bottom: 0; background: #162032; border-color: #2e3d54;">
+            <h3 style="color: var(--accent-purple);">Shared Contracts (`packages/shared`)</h3>
+            <p style="font-size: 13px; color: #94a3b8;">
+              • Zod validation schemas for forms and payloads<br>
+              • Strict Enums: BloodGroup, RequestStatus, UrgencyLevel, ComponentType, UserRole<br>
+              • Blood compatibility matrix calculation rules<br>
+              • Formatted labels and sanitizers shared by both web and api
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔄 Full-Stack Data & Security Flow</h2>
+        <div class="flow-step-container">
+          <div class="flow-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h4>Browser Interaction</h4>
+              <p>User clicks an action on the Next.js UI (e.g., submitting a blood request or accepting a donor offer).</p>
+              <span class="step-code">TanStack Query mutate() -> apiClient.request()</span>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h4>Next.js Reverse Proxy & Cookie Guard</h4>
+              <p>Next.js route handler reads secure <code>access_token</code> from HttpOnly cookie and attaches <code>Authorization: Bearer &lt;token&gt;</code> to the upstream request.</p>
+              <span class="step-code">apps/web/src/app/api/proxy/[...path]/route.ts</span>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h4>NestJS Guards, Pipes & Filters</h4>
+              <p>JWT Auth Guard validates user token. Roles Guard enforces <code>ADMIN</code> permissions where required. ValidationPipe parses and whitelists payload via class-validator & Zod.</p>
+              <span class="step-code">JwtAuthGuard -> RolesGuard -> ValidationPipe</span>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h4>Service Layer, Redis Cache & Database</h4>
+              <p>The Service layer performs business validation (e.g. eligibility cooldowns, spatial radius computation), updates PostgreSQL with TypeORM, and invalidates or updates Redis caches with stampede protection.</p>
+              <span class="step-code">Service.method() -> CacheManager -> TypeORM Repository -> PostgreSQL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: USER PERSPECTIVE & CAPABILITIES -->
+    <section id="user-perspective" class="tab-content">
+      <div class="card">
+        <h2>👥 What Can Be Done — Perspective by Role</h2>
+        <p style="color: var(--text-muted); margin-bottom: 20px;">
+          Whether you are a donor, patient in urgent need, or platform moderator, here is what the platform enables:
+        </p>
+
+        <div class="grid-3">
+          <!-- Donor Perspective -->
+          <div class="journey-card">
+            <div class="journey-header">
+              <div class="journey-icon">🩸</div>
+              <h3>As a Blood Donor</h3>
+            </div>
+            <ul class="journey-list">
+              <li><strong>Set Availability & Profile:</strong> Register blood group, location coordinates, health notes, and last donation date.</li>
+              <li><strong>Smart Feed:</strong> Browse urgent requests matched to your exact blood compatibility (e.g., O- see all, A+ see A+ and AB+).</li>
+              <li><strong>Emergency Distance Alerts:</strong> View how many kilometers away a hospital or patient is.</li>
+              <li><strong>Offer Help:</strong> Submit a response expressing readiness to donate for an open request.</li>
+              <li><strong>Safety Cooldown:</strong> Automatically protected by a 90-day cooldown after completing a donation to safeguard health.</li>
+              <li><strong>Impact History:</strong> Track personal donation certificate records and total lives impacted.</li>
+            </ul>
+          </div>
+
+          <!-- Requester Perspective -->
+          <div class="journey-card">
+            <div class="journey-header">
+              <div class="journey-icon">🏥</div>
+              <h3>As a Patient / Requester</h3>
+            </div>
+            <ul class="journey-list">
+              <li><strong>Create Urgent Requests:</strong> Specify patient name, blood group, component (whole blood, platelets, plasma), units needed, hospital, and deadline.</li>
+              <li><strong>Real-time Donor Responses:</strong> Receive incoming offers from registered donors.</li>
+              <li><strong>Accept / Decline Donors:</strong> When an offer is accepted, mutual phone and contact details unlock for hospital coordination.</li>
+              <li><strong>Confirm Transfusion:</strong> Once blood is received at the hospital, confirm the donation to formally record it.</li>
+              <li><strong>Report Abusive Content:</strong> Flag suspicious or duplicate requests with automatic anti-spam rate limiting.</li>
+            </ul>
+          </div>
+
+          <!-- Friend Network & Community -->
+          <div class="journey-card">
+            <div class="journey-header">
+              <div class="journey-icon">🤝</div>
+              <h3>Community & Friends</h3>
+            </div>
+            <ul class="journey-list">
+              <li><strong>Build Trusted Circles:</strong> Connect with friends and relatives via friend requests.</li>
+              <li><strong>Instant Emergency Reach:</strong> Quickly view friends list with their blood group, phone number, and last donation date.</li>
+              <li><strong>Search & Filter:</strong> Instantly filter friends by blood group in an emergency to know who to call first.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Administrator Perspective -->
+        <div class="journey-card" style="margin-top: 16px; border-color: var(--accent-purple);">
+          <div class="journey-header">
+            <div class="journey-icon">🛡️</div>
+            <h3 style="color: var(--accent-purple);">As an Administrator (Trust & Safety)</h3>
+          </div>
+          <div class="grid-2">
+            <ul class="journey-list">
+              <li><strong>Review Reports:</strong> Inspect reported users and flagged requests with reporter statements.</li>
+              <li><strong>Execute Sanctions:</strong> One-click action to block fraudulent users or cancel illegitimate requests.</li>
+              <li><strong>Append-Only Audit Logs:</strong> Every admin action (role changes, bans, cancellations) is immutably recorded with changeset metadata.</li>
+            </ul>
+            <ul class="journey-list">
+              <li><strong>User Management:</strong> Elevate staff to Admin or demote/block accounts.</li>
+              <li><strong>System KPIs:</strong> Real-time statistics on open vs fulfilled requests, active donors, and pending safety flags.</li>
+              <li><strong>Cache Control:</strong> Support for instant direct-to-database fresh reloads bypassing Redis.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: END-TO-END FEATURE FLOWS -->
+    <section id="feature-flows" class="tab-content">
+      <div class="card">
+        <h2>⚡ Complete Feature Execution Flows</h2>
+        <p style="color: var(--text-muted); margin-bottom: 20px;">
+          Tracing how user actions travel through client components, API routes, controller methods, service functions, and database updates.
+        </p>
+
+        <!-- FLOW 1: Blood Request to Donation Transfusion -->
+        <div class="card" style="background: #162032; border-color: #2e3d54;">
+          <h3 style="color: var(--primary);">Flow 1: Blood Request Lifecycle (Creation ➔ Matching ➔ Transfusion Confirmation)</h3>
+          <div class="flow-step-container">
+            <div class="flow-step">
+              <div class="step-number">A</div>
+              <div class="step-content">
+                <h4>1. Requester Submits Request</h4>
+                <p>Page <code>/requests/new</code> gathers patient information, blood group, units, hospital address, and map coordinates.</p>
+                <span class="step-code">POST /v1/requests ➔ RequestsController.create() ➔ RequestsService.create()</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">B</div>
+              <div class="step-content">
+                <h4>2. Geo Point & PostGIS Persistence</h4>
+                <p>Backend parses latitude/longitude into a PostGIS point <code>ST_SetSRID(ST_MakePoint(lng, lat), 4326)</code> and saves the <code>BloodRequest</code> entity with status <code>OPEN</code>.</p>
+                <span class="step-code">requestRepository.save(entity) ➔ triggers PushSubscriptionsService.sendToNearbyDonors()</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">C</div>
+              <div class="step-content">
+                <h4>3. Donor Smart Feed Matching</h4>
+                <p>Eligible donors open <code>/browse</code>. SmartFeedService evaluates blood compatibility matrix and calculates distance in KM using <code>ST_DistanceSphere</code>.</p>
+                <span class="step-code">GET /v1/smart-feed ➔ SmartFeedController.getFeed() ➔ SmartFeedService.getFeed()</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">D</div>
+              <div class="step-content">
+                <h4>4. Donor Offers to Help</h4>
+                <p>Donor views request at <code>/requests/[id]</code> and clicks "Offer to Help".</p>
+                <span class="step-code">POST /v1/responses ➔ ResponsesController.create() ➔ ResponsesService.create()</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">E</div>
+              <div class="step-content">
+                <h4>5. Requester Accepts Donor</h4>
+                <p>Requester reviews applicant profile and clicks "Accept". Contact numbers are revealed to both parties.</p>
+                <span class="step-code">PATCH /v1/responses/:id/status ➔ ResponsesService.updateStatus(ACCEPTED)</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">F</div>
+              <div class="step-content">
+                <h4>6. Donation Confirmed & 90-Day Cooldown Applied</h4>
+                <p>At <code>/history</code>, confirmation button is clicked. Creates <code>Donation</code> record, marks request as <code>FULFILLED</code>, sets donor's <code>last_donation_date = NOW()</code> and <code>is_available = false</code>.</p>
+                <span class="step-code">PATCH /v1/donations/:id/confirm ➔ DonationsService.confirm()</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLOW 2: Safety & Moderation -->
+        <div class="card" style="background: #162032; border-color: #2e3d54;">
+          <h3 style="color: var(--accent-purple);">Flow 2: Reporting, Moderation & Append-Only Audit Logging</h3>
+          <div class="flow-step-container">
+            <div class="flow-step">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <h4>User Files Safety Report</h4>
+                <p>User clicks Report on a suspicious request. Frontend submits target type and reason. Redis enforces 15-min duplicate report cooldown.</p>
+                <span class="step-code">POST /v1/reports ➔ ReportsService.create()</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h4>Admin Moderates in Admin Portal</h4>
+                <p>Admin opens <code>/admin/reports</code>, reviews evidence, selects "ACTIONED", and chooses "Block User" or "Cancel Request".</p>
+                <span class="step-code">PATCH /v1/reports/:id ➔ ReportsService.update()</span>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <h4>Immutability & Cache Invalidation</h4>
+                <p>Action records an immutable record in <code>audit_logs</code> table. Reports and Dashboard stats caches in Redis are cleared.</p>
+                <span class="step-code">AuditLogsService.record() ➔ Invalidate Redis keys: 'reports:*', 'audit_logs:stats'</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: FRONTEND MAP -->
+    <section id="frontend-map" class="tab-content">
+      <div class="card">
+        <h2>💻 Frontend Architecture & Routes (`apps/web`)</h2>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Route Path</th>
+                <th>Component / Page</th>
+                <th>Type</th>
+                <th>Description & Functionality</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>/(main)/browse</code></td>
+                <td><code>BrowsePage</code></td>
+                <td><span class="badge badge-auth">Client</span></td>
+                <td>Smart feed display, urgent blood requests filter, distance calculation, donor matching.</td>
+              </tr>
+              <tr>
+                <td><code>/(main)/requests/new</code></td>
+                <td><code>NewRequestPage</code></td>
+                <td><span class="badge badge-auth">Client</span></td>
+                <td>Multi-step blood request submission form with hospital location picker, units needed, and urgency level.</td>
+              </tr>
+              <tr>
+                <td><code>/(main)/requests/[id]</code></td>
+                <td><code>RequestDetailPage</code></td>
+                <td><span class="badge badge-auth">Server + Client</span></td>
+                <td>Detailed view of blood request, hospital map, response list (for requester), offer button (for donors).</td>
+              </tr>
+              <tr>
+                <td><code>/(main)/history</code></td>
+                <td><code>HistoryPage</code> & <code>HistoryClient</code></td>
+                <td><span class="badge badge-auth">Server + Client</span></td>
+                <td>User's personal ledger: tabbed view of My Requests, My Donations, and My Applied Responses with confirmation controls.</td>
+              </tr>
+              <tr>
+                <td><code>/(main)/friends</code></td>
+                <td><code>FriendsPage</code> & <code>FriendsClient</code></td>
+                <td><span class="badge badge-auth">Client</span></td>
+                <td>Friends list view with real-time name & blood group search, phone quick-call, last donation date, and infinite scroll.</td>
+              </tr>
+              <tr>
+                <td><code>/(main)/profile</code></td>
+                <td><code>ProfilePage</code></td>
+                <td><span class="badge badge-auth">Client</span></td>
+                <td>Donor settings: blood group, availability toggle, geolocation update, health notes, and donation eligibility timer.</td>
+              </tr>
+              <tr>
+                <td><code>/admin/dashboard</code></td>
+                <td><code>AdminDashboardPage</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td>Platform overview: total donors, active requests, fulfillment rates, and pending reports overview.</td>
+              </tr>
+              <tr>
+                <td><code>/admin/reports</code></td>
+                <td><code>AdminReportsPage</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td>Paginated report triage table with quick-links to targets, inspection modal, and one-click sanction execution.</td>
+              </tr>
+              <tr>
+                <td><code>/admin/audit-logs</code></td>
+                <td><code>AdminAuditLogsPage</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td>Paginated immutable audit log viewer with admin filter, action badges, date range filter, and JSON changeset inspector.</td>
+              </tr>
+              <tr>
+                <td><code>/admin/users</code></td>
+                <td><code>AdminUsersPage</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td>User account moderation: role switching (USER / ADMIN) and account blocking/unblocking.</td>
+              </tr>
+              <tr>
+                <td><code>/api/proxy/[...path]</code></td>
+                <td><code>proxyRequest()</code></td>
+                <td><span class="badge badge-get">Proxy API</span></td>
+                <td>Reverse proxy passing client requests to NestJS backend with HttpOnly JWT injection and header sanitation.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: BACKEND FUNCTIONS -->
+    <section id="backend-functions" class="tab-content">
+      <div class="card">
+        <h2>⚙️ Backend Functions by Module (`apps/api`)</h2>
+        <p style="color: var(--text-muted); margin-bottom: 16px;">
+          Filter functions dynamically to inspect parameters, security guards, cache mechanics, and return types.
+        </p>
+
+        <input type="text" id="functionSearch" class="search-box" placeholder="🔍 Search functions (e.g. create, findAll, confirm, cache, stampede, stats)..." onkeyup="filterFunctions()">
+
+        <div class="filter-tags" id="moduleFilterTags">
+          <span class="filter-tag active" onclick="filterByTag('ALL')">All Modules</span>
+          <span class="filter-tag" onclick="filterByTag('Admin')">Admin</span>
+          <span class="filter-tag" onclick="filterByTag('AuditLogs')">Audit Logs</span>
+          <span class="filter-tag" onclick="filterByTag('Auth')">Auth</span>
+          <span class="filter-tag" onclick="filterByTag('Donations')">Donations</span>
+          <span class="filter-tag" onclick="filterByTag('DonorProfiles')">Donor Profiles</span>
+          <span class="filter-tag" onclick="filterByTag('Friends')">Friends</span>
+          <span class="filter-tag" onclick="filterByTag('Reports')">Reports</span>
+          <span class="filter-tag" onclick="filterByTag('Requests')">Requests</span>
+          <span class="filter-tag" onclick="filterByTag('Responses')">Responses</span>
+          <span class="filter-tag" onclick="filterByTag('SmartFeed')">Smart Feed</span>
+        </div>
+
+        <div class="table-responsive">
+          <table id="functionsTable">
+            <thead>
+              <tr>
+                <th>Module</th>
+                <th>Class & Function Name</th>
+                <th>Parameters & Inputs</th>
+                <th>Cache / Security / DB Actions</th>
+                <th>Return Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Admin -->
+              <tr data-module="Admin">
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminDashboardService.getStats()</code></td>
+                <td>None</td>
+                <td>Cached in Redis (<code>admin:dashboard:stats</code>, 1h TTL). Aggregates users, requests, donations.</td>
+                <td><code>Promise&lt;DashboardStatsDto&gt;</code></td>
+              </tr>
+              <tr data-module="Admin">
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminUsersService.findAll()</code></td>
+                <td><code>query: AdminUsersQueryDto</code></td>
+                <td>Paginated user list with role & block status filtering.</td>
+                <td><code>Promise&lt;{ data: User[], meta: ... }&gt;</code></td>
+              </tr>
+              <tr data-module="Admin">
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminUsersService.updateRole()</code></td>
+                <td><code>id: string, role: UserRole, adminId: string</code></td>
+                <td>Updates role, records <code>CHANGE_ROLE</code> in audit logs.</td>
+                <td><code>Promise&lt;User&gt;</code></td>
+              </tr>
+              <tr data-module="Admin">
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminUsersService.toggleBlock()</code></td>
+                <td><code>id: string, is_active: boolean, adminId: string</code></td>
+                <td>Bans or unbans user, invalidates active sessions, records audit log.</td>
+                <td><code>Promise&lt;User&gt;</code></td>
+              </tr>
+              <!-- Audit Logs -->
+              <tr data-module="AuditLogs">
+                <td><span class="badge badge-admin">AuditLogs</span></td>
+                <td><code>AuditLogsService.record()</code></td>
+                <td><code>adminId, action, targetType, targetId, meta?</code></td>
+                <td>Strict append-only insert. Clears Redis keys: <code>audit_logs:stats</code>, <code>admin:dashboard:stats</code>.</td>
+                <td><code>Promise&lt;AuditLog&gt;</code></td>
+              </tr>
+              <tr data-module="AuditLogs">
+                <td><span class="badge badge-admin">AuditLogs</span></td>
+                <td><code>AuditLogsService.findAll()</code></td>
+                <td><code>query: AuditLogQueryDto</code></td>
+                <td>Single-flight cache stampede protection. 1-minute TTL with <code>fresh=true</code> bypass.</td>
+                <td><code>Promise&lt;{ data: EnrichedAuditLog[], meta }&gt;</code></td>
+              </tr>
+              <tr data-module="AuditLogs">
+                <td><span class="badge badge-admin">AuditLogs</span></td>
+                <td><code>AuditLogsService.enrichTargets()</code></td>
+                <td><code>logs: AuditLog[]</code></td>
+                <td>Batch resolves target labels (user names, patient names) to avoid N+1 queries.</td>
+                <td><code>Promise&lt;EnrichedAuditLog[]&gt;</code></td>
+              </tr>
+              <!-- Auth -->
+              <tr data-module="Auth">
+                <td><span class="badge badge-get">Auth</span></td>
+                <td><code>AuthService.validateGoogleUser()</code></td>
+                <td><code>profile: GoogleProfile</code></td>
+                <td>Upserts user record based on <code>google_id</code>.</td>
+                <td><code>Promise&lt;User&gt;</code></td>
+              </tr>
+              <tr data-module="Auth">
+                <td><span class="badge badge-get">Auth</span></td>
+                <td><code>AuthService.generateTokens()</code></td>
+                <td><code>user: User</code></td>
+                <td>Signs 15-min JWT access token and 7-day refresh token saved to database.</td>
+                <td><code>Promise&lt;TokensDto&gt;</code></td>
+              </tr>
+              <!-- Donations -->
+              <tr data-module="Donations">
+                <td><span class="badge badge-post">Donations</span></td>
+                <td><code>DonationsService.confirm()</code></td>
+                <td><code>donationId: string, userId: string</code></td>
+                <td>Sets donation <code>is_confirmed=true</code>, marks request <code>FULFILLED</code>, updates donor profile <code>last_donation_date=NOW()</code> and <code>is_available=false</code>.</td>
+                <td><code>Promise&lt;Donation&gt;</code></td>
+              </tr>
+              <tr data-module="Donations">
+                <td><span class="badge badge-post">Donations</span></td>
+                <td><code>DonationsService.findMyDonations()</code></td>
+                <td><code>userId: string</code></td>
+                <td>Queries user's donation history with hospital and patient relations.</td>
+                <td><code>Promise&lt;Donation[]&gt;</code></td>
+              </tr>
+              <!-- Donor Profiles -->
+              <tr data-module="DonorProfiles">
+                <td><span class="badge badge-post">DonorProfiles</span></td>
+                <td><code>DonorProfilesService.updateProfile()</code></td>
+                <td><code>userId: string, dto: UpdateDonorProfileDto</code></td>
+                <td>Updates blood group, PostGIS coordinates <code>ST_MakePoint(lng, lat)</code>, availability, health notes.</td>
+                <td><code>Promise&lt;DonorProfile&gt;</code></td>
+              </tr>
+              <tr data-module="DonorProfiles">
+                <td><span class="badge badge-post">DonorProfiles</span></td>
+                <td><code>DonorAvailabilityCron.checkEligibility()</code></td>
+                <td>Midnight CRON schedule</td>
+                <td>Runs daily at 00:00: resets <code>is_available=true</code> for donors whose 90-day cooldown has elapsed.</td>
+                <td><code>Promise&lt;void&gt;</code></td>
+              </tr>
+              <!-- Friends -->
+              <tr data-module="Friends">
+                <td><span class="badge badge-get">Friends</span></td>
+                <td><code>FriendsService.getFriends()</code></td>
+                <td><code>userId: string, query: GetFriendsQueryDto</code></td>
+                <td>Fetches mutual friends, joins donor profiles, filters by search name and blood group.</td>
+                <td><code>Promise&lt;FriendDto[]&gt;</code></td>
+              </tr>
+              <tr data-module="Friends">
+                <td><span class="badge badge-get">Friends</span></td>
+                <td><code>FriendsService.sendFriendRequest()</code></td>
+                <td><code>userId: string, targetUserId: string</code></td>
+                <td>Validates non-self, creates friendship with <code>PENDING</code> status.</td>
+                <td><code>Promise&lt;Friendship&gt;</code></td>
+              </tr>
+              <!-- Reports -->
+              <tr data-module="Reports">
+                <td><span class="badge badge-admin">Reports</span></td>
+                <td><code>ReportsService.create()</code></td>
+                <td><code>userId: string, dto: CreateReportDto</code></td>
+                <td>Verifies target existence, enforces 15-min Redis cooldown to prevent abuse, saves report.</td>
+                <td><code>Promise&lt;Report&gt;</code></td>
+              </tr>
+              <tr data-module="Reports">
+                <td><span class="badge badge-admin">Reports</span></td>
+                <td><code>ReportsService.update()</code></td>
+                <td><code>id: string, dto: UpdateReportDto, adminId: string</code></td>
+                <td>Updates report status (ACTIONED/DISMISSED), optionally triggers user ban or request cancellation, records audit log.</td>
+                <td><code>Promise&lt;Report&gt;</code></td>
+              </tr>
+              <!-- Requests -->
+              <tr data-module="Requests">
+                <td><span class="badge badge-post">Requests</span></td>
+                <td><code>RequestsService.create()</code></td>
+                <td><code>requesterId: string, dto: CreateBloodRequestDto</code></td>
+                <td>Converts lat/lng to PostGIS geometry, saves blood request, triggers webpush notification dispatch.</td>
+                <td><code>Promise&lt;BloodRequest&gt;</code></td>
+              </tr>
+              <tr data-module="Requests">
+                <td><span class="badge badge-post">Requests</span></td>
+                <td><code>RequestsService.findAll()</code></td>
+                <td><code>query: QueryBloodRequestsDto</code></td>
+                <td>Filtered search: blood group, urgency, status, radius from user coordinates.</td>
+                <td><code>Promise&lt;{ data: BloodRequest[], meta }&gt;</code></td>
+              </tr>
+              <!-- Responses -->
+              <tr data-module="Responses">
+                <td><span class="badge badge-patch">Responses</span></td>
+                <td><code>ResponsesService.create()</code></td>
+                <td><code>donorId: string, dto: CreateResponseDto</code></td>
+                <td>Prevents duplicate responses, saves donor offer with message for requester review.</td>
+                <td><code>Promise&lt;RequestResponse&gt;</code></td>
+              </tr>
+              <tr data-module="Responses">
+                <td><span class="badge badge-patch">Responses</span></td>
+                <td><code>ResponsesService.updateStatus()</code></td>
+                <td><code>responseId: string, requesterId: string, status: ResponseStatus</code></td>
+                <td>Transitions status (ACCEPTED/DECLINED). Unlocks contact details on acceptance.</td>
+                <td><code>Promise&lt;RequestResponse&gt;</code></td>
+              </tr>
+              <!-- Smart Feed -->
+              <tr data-module="SmartFeed">
+                <td><span class="badge badge-get">SmartFeed</span></td>
+                <td><code>SmartFeedService.getFeed()</code></td>
+                <td><code>userId: string, query: SmartFeedQueryDto</code></td>
+                <td>Queries compatible blood groups, calculates distances using <code>ST_DistanceSphere</code>, weights critical urgency first.</td>
+                <td><code>Promise&lt;FeedItemDto[]&gt;</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: ROUTES CATALOG -->
+    <section id="routes-catalog" class="tab-content">
+      <div class="card">
+        <h2>🌐 Complete API Route Catalog (NestJS API Gateway v1)</h2>
+        <input type="text" id="routeSearch" class="search-box" placeholder="🔍 Search routes (e.g. GET, POST, /requests, /admin, reports)..." onkeyup="filterRoutes()">
+
+        <div class="table-responsive">
+          <table id="routesTable">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Endpoint Path</th>
+                <th>Access Level</th>
+                <th>Controller Handler</th>
+                <th>Description & Payload</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Auth -->
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/auth/google</code></td>
+                <td><span class="badge badge-auth">Public</span></td>
+                <td><code>AuthController.googleAuth</code></td>
+                <td>Initiates Google OAuth2 redirection flow.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/auth/google/callback</code></td>
+                <td><span class="badge badge-auth">Public</span></td>
+                <td><code>AuthController.googleAuthRedirect</code></td>
+                <td>Handles Google OAuth callback, creates user, issues JWT tokens.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/auth/refresh</code></td>
+                <td><span class="badge badge-auth">Public</span></td>
+                <td><code>AuthController.refreshToken</code></td>
+                <td>Rotates access token using database-backed refresh token.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/auth/logout</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>AuthController.logout</code></td>
+                <td>Revokes refresh token in database.</td>
+              </tr>
+              <!-- Requests -->
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/requests</code></td>
+                <td><span class="badge badge-auth">Public / User</span></td>
+                <td><code>RequestsController.findAll</code></td>
+                <td>List blood requests with filters for blood group, urgency, and distance.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/requests</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>RequestsController.create</code></td>
+                <td>Create a new blood request with patient details, hospital, units, coordinates.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/requests/me</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>RequestsController.findMyRequests</code></td>
+                <td>List all requests posted by current authenticated user.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/requests/:id</code></td>
+                <td><span class="badge badge-auth">Public / User</span></td>
+                <td><code>RequestsController.findOne</code></td>
+                <td>Get request details with requester relation and hospital coordinates.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/requests/:id/status</code></td>
+                <td><span class="badge badge-auth">Requester / Admin</span></td>
+                <td><code>RequestsController.updateStatus</code></td>
+                <td>Transition request status (OPEN, FULFILLED, CANCELLED).</td>
+              </tr>
+              <!-- Responses -->
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/responses</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>ResponsesController.create</code></td>
+                <td>Donor offers help on a blood request.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/responses/me</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>ResponsesController.findMyResponses</code></td>
+                <td>List all blood assistance applications submitted by donor.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/responses/:id/status</code></td>
+                <td><span class="badge badge-auth">Requester</span></td>
+                <td><code>ResponsesController.updateStatus</code></td>
+                <td>Accept or decline donor offer. Unlocks mutual contact numbers on ACCEPTED.</td>
+              </tr>
+              <!-- Donations -->
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/donations/me</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>DonationsController.findMyDonations</code></td>
+                <td>Personal history of completed blood donations with hospital names.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/donations/:id/confirm</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>DonationsController.confirmDonation</code></td>
+                <td>Confirm transfusion completed; triggers 90-day cooldown on donor profile.</td>
+              </tr>
+              <!-- Friends -->
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/friends</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>FriendsController.getFriends</code></td>
+                <td>List accepted friends with name, blood group, phone number, last donation date.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/friends/request</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>FriendsController.sendRequest</code></td>
+                <td>Send friend request by target user UUID.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/friends/:id/accept</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>FriendsController.acceptRequest</code></td>
+                <td>Accept incoming friend request.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-delete">DELETE</span></td>
+                <td><code>/v1/friends/:id</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>FriendsController.removeFriend</code></td>
+                <td>Remove friend or cancel pending friend request.</td>
+              </tr>
+              <!-- Reports & Moderation -->
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/reports</code></td>
+                <td><span class="badge badge-auth">User</span></td>
+                <td><code>ReportsController.create</code></td>
+                <td>Report a user or request. Protected by 15-minute anti-spam Redis cooldown.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/reports</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>ReportsController.findAll</code></td>
+                <td>Paginated reports table with status and target filters.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/reports/stats</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>ReportsController.getStats</code></td>
+                <td>Summary of pending, actioned, and dismissed safety reports.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/reports/:id</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>ReportsController.update</code></td>
+                <td>Review report, action sanctions (block user, cancel request), log audit.</td>
+              </tr>
+              <!-- Audit Logs -->
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/admin/audit-logs</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminAuditLogsController.findAll</code></td>
+                <td>Paginated audit log ledger with single-flight stampede protection.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/admin/audit-logs/stats</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminAuditLogsController.getStats</code></td>
+                <td>24-hour admin action velocity and action type breakdown.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/admin/audit-logs/admins</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminAuditLogsController.getAdmins</code></td>
+                <td>List of administrators who have recorded audit events.</td>
+              </tr>
+              <!-- Admin Dashboard & Users -->
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/admin/dashboard/stats</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminDashboardController.getStats</code></td>
+                <td>High-level KPI metrics (total users, open requests, donations, reports).</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/v1/admin/users</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminUsersController.findAll</code></td>
+                <td>Paginated user list with role & block status filters.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/admin/users/:id/role</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminUsersController.updateRole</code></td>
+                <td>Elevate/demote user role (USER / ADMIN).</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-patch">PATCH</span></td>
+                <td><code>/v1/admin/users/:id/block</code></td>
+                <td><span class="badge badge-admin">Admin</span></td>
+                <td><code>AdminUsersController.toggleBlock</code></td>
+                <td>Suspend or reactivate user account.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-link').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      const activeBtn = Array.from(document.querySelectorAll('.tab-link')).find(btn => btn.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const target = document.getElementById(tabId);
+      if (target) target.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Perspective Switching
+    function switchPerspective(mode) {
+      document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.view-btn')).find(btn => btn.getAttribute('onclick').includes(mode));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      if (mode === 'non-tech') {
+        switchTab('user-perspective');
+      } else if (mode === 'tech') {
+        switchTab('backend-functions');
+      } else {
+        switchTab('overview');
+      }
+    }
+
+    // Filter Functions Table
+    function filterFunctions() {
+      const input = document.getElementById('functionSearch').value.toLowerCase();
+      const rows = document.querySelectorAll('#functionsTable tbody tr');
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+      });
+    }
+
+    // Filter by Module Tag
+    function filterByTag(moduleName) {
+      document.querySelectorAll('#moduleFilterTags .filter-tag').forEach(tag => tag.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const rows = document.querySelectorAll('#functionsTable tbody tr');
+      rows.forEach(row => {
+        if (moduleName === 'ALL') {
+          row.style.display = '';
+        } else {
+          const rowMod = row.getAttribute('data-module');
+          row.style.display = (rowMod === moduleName) ? '' : 'none';
+        }
+      });
+    }
+
+    // Filter Routes Table
+    function filterRoutes() {
+      const input = document.getElementById('routeSearch').value.toLowerCase();
+      const rows = document.querySelectorAll('#routesTable tbody tr');
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
+
