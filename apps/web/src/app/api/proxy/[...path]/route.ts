@@ -3,13 +3,24 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_URL =
   process.env.INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001/v1";
+  process.env.NEXT_PUBLIC_API_URL;
 
 async function proxyRequest(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  if (!API_URL) {
+    return NextResponse.json(
+      {
+        success: false,
+        statusCode: 500,
+        error: {
+          message: "Missing environment variable: INTERNAL_API_URL or NEXT_PUBLIC_API_URL is required",
+        },
+      },
+      { status: 500 }
+    );
+  }
   const { path } = await params;
   const targetPath = "/" + (path || []).join("/");
   const search = request.nextUrl.search;

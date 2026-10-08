@@ -10,6 +10,7 @@ export const dataSourceOptions: DataSourceOptions = {
   url: process.env.DATABASE_URL,
   entities: [join(__dirname, '../**/*.entity{.ts,.js}')],
   migrations: [join(__dirname, '../migrations/*{.ts,.js}')],
+  migrationsRun: process.env.MIGRATIONS_RUN === 'false' ? false : true,
   synchronize: false,
 };
 

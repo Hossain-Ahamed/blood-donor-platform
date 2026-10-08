@@ -24,9 +24,10 @@ export default function LoginPage() {
     } catch {
       // ignore
     }
-    // Redirect to the backend Google OAuth flow
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/v1";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
+    if (!API_URL) {
+      throw new Error("Missing environment variable: NEXT_PUBLIC_API_URL is required");
+    }
     window.location.href = `${API_URL}/auth/google`;
   };
 

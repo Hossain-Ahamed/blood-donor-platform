@@ -19,6 +19,15 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # Copy source code
 COPY . .
 
+# Build arguments for frontend
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_PROJECT_NAME
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_PROJECT_NAME=$NEXT_PUBLIC_PROJECT_NAME
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
 # Build the shared package and web app
 RUN pnpm --filter @repo/shared build
 RUN pnpm --filter web build
@@ -34,7 +43,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy the standalone output and static files
-COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 

@@ -1,87 +1,173 @@
 # Deployment Guide
 
-This project is fully containerized with Docker Compose for a self-hosted environment. It includes a PostgreSQL (+ PostGIS) database, Redis, the NestJS API, the Next.js Web frontend, and a Caddy reverse proxy that automatically handles HTTPS (Let's Encrypt).
+This project is containerized with Docker Compose. It includes:
+- **PostgreSQL (+ PostGIS)** database (internal network)
+- **Redis** cache (internal network)
+- **NestJS API** backend (`apps/api`)
+- **Next.js** frontend (`apps/web`)
+- *(Optional)* **Caddy** reverse proxy for automated HTTPS (`docker-compose.prod.yml`)
+
+---
 
 ## 1. Prerequisites
 
-- A Linux VPS (Ubuntu/Debian recommended)
-- A domain name pointing to your VPS's IP address (A record)
-- Docker and Docker Compose installed
-- Git installed (to clone your repository)
+- Docker and Docker Compose (v2.x recommended)
+- Git (to clone the repository)
+- A domain name pointing to your VPS (if deploying with SSL/Caddy)
 
-## 2. Configuration (.env)
+---
 
-Create a real `.env` file at the root of the project. Do **NOT** commit this file.
+## 2. Configuration (`.env`)
+
+Create a `.env` file at the root of the project:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in the **real** values:
-- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
-- `REDIS_PASSWORD`
-- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (generate random secure strings)
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (from Google Cloud Console)
-- `GOOGLE_CALLBACK_URL` (e.g. `https://yourdomain.com/v1/auth/google/callback`)
-- `CORS_ORIGIN` (e.g. `https://yourdomain.com`)
-- `NEXT_PUBLIC_API_URL` (e.g. `https://yourdomain.com/v1`)
-- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (Required for web push notifications. Generate a pair by running `npx web-push generate-vapid-keys` in your terminal and paste them here)
+All variables are strictly required by Docker Compose. If any variable is missing, Compose will stop and display an error.
 
-### Caddyfile Update
-Open `Caddyfile` and replace `example.com` at the top with your actual domain (e.g. `Blood Aid.com`).
+### Required Variables:
 
-## 3. Build and Start the Services
+| Variable | Description | Example / Default |
+|---|---|---|
+| `PROJECT_NAME` | Project display name | `"Blood Aid"` |
+| `NODE_ENV` | Environment mode | `production` |
+| `POSTGRES_USER` | PostgreSQL superuser | `postgres` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | `postgres` |
+| `POSTGRES_DB` | Database name | `blood_platform` |
+| `REDIS_PASSWORD` | Redis authentication password | `redispassword` |
+| `PORT` | API internal port | `3001` |
+| `API_PORT` | API host port (for external API consumers) | `3001` |
+| `JWT_ACCESS_SECRET` | Secret for access tokens | Random 32+ char string |
+| `JWT_ACCESS_EXPIRES_IN` | Access token lifespan | `15m` |
+| `JWT_REFRESH_SECRET` | Secret for refresh tokens | Random 32+ char string |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifespan | `30d` |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | From Google Cloud Console |
+| `GOOGLE_CALLBACK_URL` | OAuth redirect URL | `http://localhost:3001/v1/auth/google/callback` |
+| `CORS_ORIGIN` | Allowed web origin | `http://localhost:3000` |
+| `MIGRATIONS_RUN` | Auto-run TypeORM migrations on boot | `true` |
+| `VAPID_PUBLIC_KEY` | Web push public key | ECDH base64url key |
+| `VAPID_PRIVATE_KEY` | Web push private key | ECDH base64url key |
+| `WEB_PORT` | Frontend host port | `3000` |
+| `INTERNAL_API_URL` | Web-to-API internal Docker URL | `http://api:3001/v1` |
+| `NEXT_PUBLIC_API_URL` | External API URL for browser redirects | `http://localhost:3001/v1` |
+| `NEXT_PUBLIC_PROJECT_NAME` | Frontend project title | `"Blood Aid"` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`| Web push key for browser subscriptions | Matches `VAPID_PUBLIC_KEY` |
 
-Run the following command to build the production images and start the stack in detached mode:
+> [!NOTE]
+> To generate new VAPID keys, run: `npx web-push generate-vapid-keys`
+
+---
+
+## 3. Network & Port Architecture
+
+Only **two ports** are exposed to the host machine:
+- **Port 3000 (`WEB_PORT`)**: Next.js frontend application.
+- **Port 3001 (`API_PORT`)**: Backend API & Swagger UI for external clients and OAuth redirects.
+
+**Internal Isolation:**
+- PostgreSQL (`5432`) and Redis (`6379`) are isolated inside the `backend` Docker network and are **not** exposed to the outside world.
+- The `web` container communicates directly with `api` through Docker's internal DNS using `INTERNAL_API_URL=http://api:3001/v1`.
+
+---
+
+## 4. Build and Start the Stack
+
+To build the images and launch the entire stack in detached mode:
+
+```bash
+docker compose up -d --build
+```
+
+### Access Endpoints:
+- **Website**: [http://localhost:3000](http://localhost:3000)
+- **API Swagger Documentation**: [http://localhost:3001/api/docs](http://localhost:3001/api/docs)
+- **API Health Check**: [http://localhost:3001/v1/health](http://localhost:3001/v1/health)
+
+---
+
+## 5. Database Migrations & Seeding
+
+### Migrations
+Migrations (including PostGIS extension initialization and table schema creation) run **automatically on container startup** when `MIGRATIONS_RUN=true`.
+
+If you ever need to run migrations manually:
+
+```bash
+docker compose exec api pnpm --filter api migration:run
+```
+
+### Seeding (Optional)
+To populate sample donors and requests:
+
+```bash
+docker compose exec api pnpm --filter api seed
+```
+
+---
+
+## 6. Bootstrapping the First Admin
+
+There is no public signup for Admins. To grant the first user admin privileges:
+
+1. Sign in once via Google OAuth at `http://localhost:3000/login`.
+2. Connect to the PostgreSQL database container:
+
+```bash
+docker compose exec postgres psql -U postgres -d blood_platform
+```
+
+3. Update the user's role:
+
+```sql
+UPDATE users SET role = 'ADMIN' WHERE email = 'your.email@gmail.com';
+```
+
+---
+
+## 7. Production with Caddy & HTTPS (Optional)
+
+If deploying to a public VPS with domain names and automated Let's Encrypt certificates:
+
+1. Update [Caddyfile](file:///home/hossain/Documents/blood-donor-platform/Caddyfile) with your domain name.
+2. Start the production compose stack:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## 4. Run Migrations
+---
 
-Once the stack is up, you need to run the TypeORM migrations inside the API container to set up the database schema and enable PostGIS:
+## 8. Maintenance & Operations
 
+**View logs from all containers:**
 ```bash
-docker compose -f docker-compose.prod.yml exec api pnpm --filter api migration:run
-```
-
-*(Optional) Seed the database if you want sample data:*
-```bash
-docker compose -f docker-compose.prod.yml exec api pnpm --filter api seed
-```
-
-## 5. Bootstrapping the First Admin
-
-There is no signup flow for Admins. To grant the first user admin privileges, they must first log in normally via Google. Then, manually update their role in the database:
-
-```bash
-# Connect to the PostgreSQL container
-docker compose -f docker-compose.prod.yml exec postgres psql -U <POSTGRES_USER> -d <POSTGRES_DB>
-
-# Run this SQL command:
-UPDATE users SET role = 'ADMIN' WHERE email = 'your.email@gmail.com';
-```
-
-## 6. Maintenance & Logs
-
-**View all logs:**
-```bash
-docker compose -f docker-compose.prod.yml logs -f
+docker compose logs -f
 ```
 
 **View API logs specifically:**
 ```bash
-docker compose -f docker-compose.prod.yml logs -f api
+docker compose logs -f api
 ```
 
-**Restart a service (e.g., API):**
+**Restart a service:**
 ```bash
-docker compose -f docker-compose.prod.yml restart api
+docker compose restart api
+```
+
+**Check service health:**
+```bash
+docker compose ps
 ```
 
 **Stop the stack:**
 ```bash
-docker compose -f docker-compose.prod.yml down
+docker compose down
 ```
 
+**Stop and remove persistent volumes (Caution: removes database data):**
+```bash
+docker compose down -v
+```
