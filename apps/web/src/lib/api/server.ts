@@ -26,7 +26,13 @@ export const apiServer = {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const baseUrl = API_URL.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+    const versionedPath = cleanEndpoint.match(/^\/(v\d+|auth)(\/|$)/)
+      ? cleanEndpoint
+      : `/v1${cleanEndpoint}`;
+
+    const response = await fetch(`${baseUrl}${versionedPath}`, {
       ...options,
       headers,
       cache: "no-store", // Ensure we fetch fresh data on the server by default

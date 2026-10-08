@@ -28,7 +28,8 @@ export default function LoginPage() {
     if (!API_URL) {
       throw new Error("Missing environment variable: NEXT_PUBLIC_API_URL is required");
     }
-    window.location.href = `${API_URL}/auth/google`;
+    const authBaseUrl = API_URL.replace(/\/v1\/?$/, "");
+    window.location.href = `${authBaseUrl}/auth/google`;
   };
 
   return (

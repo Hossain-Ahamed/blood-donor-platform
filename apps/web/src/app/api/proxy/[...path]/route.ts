@@ -24,7 +24,16 @@ async function proxyRequest(
   const { path } = await params;
   const targetPath = "/" + (path || []).join("/");
   const search = request.nextUrl.search;
-  const targetUrl = `${API_URL}${targetPath}${search}`;
+
+  // Normalize base API URL (supports both base URL and versioned URL in env)
+  const baseUrl = API_URL.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+
+  // If path already starts with a version (/v1, /v2, etc.) or /auth, preserve it; otherwise default to /v1
+  const versionedPath = targetPath.match(/^\/(v\d+|auth)(\/|$)/)
+    ? targetPath
+    : `/v1${targetPath}`;
+
+  const targetUrl = `${baseUrl}${versionedPath}${search}`;
 
   const cookieStore = await cookies();
   const token = cookieStore.get("access_token")?.value;

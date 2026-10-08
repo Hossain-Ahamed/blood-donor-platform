@@ -1,9 +1,12 @@
-import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, Res, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { Public } from '../../common/decorators/public.decorator';
 
-@Controller('auth')
+@Controller({
+  path: 'auth',
+  version: [VERSION_NEUTRAL, '1'],
+})
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
