@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Install required packages
 RUN apk add --no-cache libc6-compat
@@ -23,7 +23,7 @@ COPY . .
 RUN pnpm --filter @repo/shared build
 RUN pnpm --filter api build
 
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
