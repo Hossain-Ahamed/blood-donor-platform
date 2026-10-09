@@ -12,6 +12,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed": "ts-node -r dotenv/config src/seed.ts dotenv_config_path=../../.env",
+    "seed:prod": "node dist/seed.js",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:run": "pnpm run typeorm migration:run -d src/config/typeorm.config.ts",
     "migration:generate": "pnpm run typeorm migration:generate -d src/config/typeorm.config.ts",

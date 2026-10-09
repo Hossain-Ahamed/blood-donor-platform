@@ -1,37 +1,50 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-const API_URL =
-  process.env.INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL;
+function getApiUrl(): string {
+  const url = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (!url) {
+    throw new Error(
+      "Missing environment variable: INTERNAL_API_URL or NEXT_PUBLIC_API_URL is required"
+    );
+  }
+  return url;
+}
 
 async function proxyRequest(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
-  if (!API_URL) {
+  let apiUrl: string;
+  try {
+    apiUrl = getApiUrl();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
       {
         success: false,
         statusCode: 500,
-        error: {
-          message: "Missing environment variable: INTERNAL_API_URL or NEXT_PUBLIC_API_URL is required",
-        },
+        error: { message },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
   const { path } = await params;
   const targetPath = "/" + (path || []).join("/");
   const search = request.nextUrl.search;
 
-  // Normalize base API URL (supports both base URL and versioned URL in env)
-  const baseUrl = API_URL.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+  // Clean base API URL of any trailing slashes or version tags
+  const baseUrl = apiUrl.replace(/\/v\d+\/?$/, "").replace(/\/$/, "");
 
-  // If path already starts with a version (/v1, /v2, etc.) or /auth, preserve it; otherwise default to /v1
+  // Use fixed web version from env (defaults to v1)
+  const rawVersion = process.env.NEXT_PUBLIC_API_VERSION || "v1";
+  const webVersion = rawVersion.startsWith("v") ? rawVersion : `v${rawVersion}`;
+
+  // If path already starts with an explicit version (/v1, /v2, etc.) or /auth, preserve it; otherwise use configured web version
   const versionedPath = targetPath.match(/^\/(v\d+|auth)(\/|$)/)
     ? targetPath
-    : `/v1${targetPath}`;
+    : `/${webVersion}${targetPath}`;
 
   const targetUrl = `${baseUrl}${versionedPath}${search}`;
 
@@ -81,7 +94,8 @@ async function proxyRequest(
       statusText: backendRes.statusText,
       headers: resHeaders,
     });
-  } catch (error: any) {
+    // @ts-expect-error
+  } catch (error: never) {
     return NextResponse.json(
       {
         success: false,
@@ -91,7 +105,7 @@ async function proxyRequest(
           details: error.message,
         },
       },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }
@@ -101,4 +115,3 @@ export const POST = proxyRequest;
 export const PUT = proxyRequest;
 export const PATCH = proxyRequest;
 export const DELETE = proxyRequest;
-

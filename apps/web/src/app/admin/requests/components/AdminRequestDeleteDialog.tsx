@@ -34,12 +34,10 @@ export function AdminRequestDeleteDialog({
             <AlertTriangle className="w-5 h-5" />
           </div>
           <DialogTitle className="text-lg font-bold">
-            Delete Blood Request?
+            Permanently Delete Request?
           </DialogTitle>
           <DialogDescription className="text-xs">
-            As an administrator, are you sure you want to delete this blood
-            request? This will remove the request from public listings and search
-            results.
+            This action cannot be undone. This blood request and all associated donor responses will be permanently removed from the system.
           </DialogDescription>
         </DialogHeader>
 
@@ -66,7 +64,7 @@ export function AdminRequestDeleteDialog({
             ) : (
               <Trash2 className="w-4 h-4 mr-1.5" />
             )}
-            Confirm Delete
+            Permanently Delete
           </Button>
         </DialogFooter>
       </DialogContent>

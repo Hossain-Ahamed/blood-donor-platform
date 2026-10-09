@@ -43,10 +43,13 @@ export class AdminRequestsService {
     try {
       const qb = this.requestRepository
         .createQueryBuilder("request")
-        .withDeleted()
         .leftJoinAndSelect("request.requester", "requester")
         .skip(skip)
         .take(limit);
+
+      if (query.include_deleted === "true" || query.with_deleted === "true") {
+        qb.withDeleted();
+      }
 
       if (searchId) {
         qb.andWhere("CAST(request.id AS TEXT) ILIKE :searchId", {
@@ -120,7 +123,7 @@ export class AdminRequestsService {
         order: { created_at: "DESC" },
         skip,
         take: limit,
-        withDeleted: true,
+        withDeleted: query.include_deleted === "true" || query.with_deleted === "true",
       });
 
       return {
@@ -216,11 +219,35 @@ export class AdminRequestsService {
     if (!request) throw new NotFoundException("Request not found");
 
     const before = { ...request };
-    await this.requestRepository.softDelete(id);
+
+    // Clean up any dependent donations and response records to prevent foreign key errors
+    await this.requestRepository.manager.query(
+      `DELETE FROM donations WHERE response_id IN (SELECT id FROM responses WHERE request_id = $1)`,
+      [id],
+    );
+    await this.requestRepository.manager.query(
+      `DELETE FROM responses WHERE request_id = $1`,
+      [id],
+    );
+
+    // Hard delete the request permanently from the database
+    await this.requestRepository.manager.query(
+      `DELETE FROM requests WHERE id = $1`,
+      [id],
+    );
+
     await invalidateCacheKeys(this.cacheManager, [
       `profile:user:${request.requester_id}`,
       "admin:dashboard:stats",
     ]);
+
+    try {
+      if (typeof (this.cacheManager as any).reset === "function") {
+        await (this.cacheManager as any).reset();
+      }
+    } catch {
+      // cache reset failover
+    }
 
     try {
       await this.auditLogsService.record(

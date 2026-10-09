@@ -19,25 +19,23 @@ export class AuthService {
     }
     const { google_id, email, name, avatar_url } = req.user;
 
-    let user = await this.userRepository.findOne({ 
+    let user = await this.userRepository.findOne({
       where: [
         { google_id },
-        { email }
-      ] 
+        { email },
+      ],
     });
-    
+
     if (!user) {
       user = this.userRepository.create({
         google_id,
         email,
         name,
         avatar_url,
-        role: email === 'ahamed.hossain@rpsu.edu.bd' ? UserRole.ADMIN : UserRole.USER,
+        role: UserRole.USER,
       });
       await this.userRepository.save(user);
     } else {
-      // If found by email but google_id is different/empty (from seed), update it
-      // Check and sync any changed fields
       let updated = false;
       if (user.google_id !== google_id) {
         user.google_id = google_id;
@@ -47,12 +45,12 @@ export class AuthService {
         user.email = email;
         updated = true;
       }
-      if (user.avatar_url !== avatar_url) {
+      if (avatar_url && user.avatar_url !== avatar_url) {
         user.avatar_url = avatar_url;
         updated = true;
       }
-      if (user.email === 'ahamed.hossain@rpsu.edu.bd' && user.role !== UserRole.ADMIN) {
-        user.role = UserRole.ADMIN;
+      if (name && user.name !== name) {
+        user.name = name;
         updated = true;
       }
       if (updated) {
@@ -69,7 +67,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         avatar_url: user.avatar_url,
-      }
+      },
     };
   }
 }

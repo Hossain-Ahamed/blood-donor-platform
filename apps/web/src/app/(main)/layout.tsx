@@ -5,6 +5,8 @@ import { MainNav } from "@/components/MainNav";
 import { UserNav } from "@/components/UserNav";
 import { SmartAlertBell } from "@/components/SmartAlertBell";
 
+import { APP_NAME } from "@/lib/config";
+
 export const dynamic = "force-dynamic";
 
 export default async function MainLayout({
@@ -27,7 +29,7 @@ export default async function MainLayout({
       <header className="px-4 lg:px-6 h-16 flex items-center border-b bg-white dark:bg-zinc-900 sticky top-0 z-50">
         <Link className="flex items-center justify-center" href="/browse">
           <span className="font-bold text-xl text-red-600 dark:text-red-500">
-            Blood Aid
+            {APP_NAME}
           </span>
         </Link>
 

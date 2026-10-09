@@ -15,8 +15,40 @@ server {
     # Maximum upload size
     client_max_body_size 20M;
 
+    # Gzip compression
+    gzip on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
+
     # --------------------------------------------------------------------------
-    # 1. Google OAuth & Auth endpoints (unversioned) -> NestJS API (port 3001)
+    # 1. Service Worker (/sw.js) - NEVER CACHE to allow immediate PWA / push updates
+    # --------------------------------------------------------------------------
+    location = /sw.js {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        expires 0;
+    }
+
+    # --------------------------------------------------------------------------
+    # 2. Next.js Static Assets - Long-term immutable caching
+    # --------------------------------------------------------------------------
+    location /_next/static {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    # --------------------------------------------------------------------------
+    # 3. Google OAuth & Auth endpoints (unversioned) -> NestJS API (port 3001)
     # --------------------------------------------------------------------------
     location /auth {
         proxy_pass http://127.0.0.1:3001;
@@ -31,7 +63,7 @@ server {
     }
 
     # --------------------------------------------------------------------------
-    # 2. Versioned API Endpoints (/v1, /v2, etc.) -> NestJS API (port 3001)
+    # 4. Versioned API Endpoints (/v1, /v2, etc.) -> NestJS API (port 3001)
     # --------------------------------------------------------------------------
     location ~ ^/v\d+ {
         proxy_pass http://127.0.0.1:3001;
@@ -46,9 +78,9 @@ server {
     }
 
     # --------------------------------------------------------------------------
-    # 3. Swagger API Documentation -> NestJS API (port 3001)
+    # 5. Swagger API Documentation -> NestJS API (port 3001)
     # --------------------------------------------------------------------------
-    location /api/docs {
+    location ~ ^/api/docs {
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -58,7 +90,7 @@ server {
     }
 
     # --------------------------------------------------------------------------
-    # 4. Next.js Frontend Website -> Next.js Web (port 3000)
+    # 6. Next.js Frontend Website -> Next.js Web (port 3000)
     # --------------------------------------------------------------------------
     location / {
         proxy_pass http://127.0.0.1:3000;

@@ -24,16 +24,18 @@ async function bootstrap() {
     }),
   );
 
+  const configService = app.get(ConfigService);
+  const appName = configService.get<string>("PROJECT_NAME") || "Blood Aid";
+
   const config = new DocumentBuilder()
-    .setTitle("Blood Aid API")
-    .setDescription("The Blood Aid blood donation API")
+    .setTitle(`${appName} API`)
+    .setDescription(`The ${appName} blood donation API`)
     .setVersion("1.0")
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
 
-  const configService = app.get(ConfigService);
   const port = configService.get<string>("PORT") || 3001;
   const corsOrigin = configService.get<string>("CORS_ORIGIN");
 

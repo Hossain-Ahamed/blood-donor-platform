@@ -1,12 +1,14 @@
 import { cookies } from "next/headers";
 import { ApiError } from "./client";
 
-const API_URL =
-  process.env.INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL;
-
-if (!API_URL) {
-  throw new Error("Missing environment variable: INTERNAL_API_URL or NEXT_PUBLIC_API_URL is required");
+function getApiUrl(): string {
+  const url = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (!url) {
+    throw new Error(
+      "Missing environment variable: INTERNAL_API_URL or NEXT_PUBLIC_API_URL is required"
+    );
+  }
+  return url;
 }
 
 export const apiServer = {
@@ -27,10 +29,13 @@ export const apiServer = {
     }
 
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const baseUrl = API_URL.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+    const baseUrl = getApiUrl().replace(/\/v\d+\/?$/, "").replace(/\/$/, "");
+    const rawVersion = process.env.NEXT_PUBLIC_API_VERSION || "v1";
+    const webVersion = rawVersion.startsWith("v") ? rawVersion : `v${rawVersion}`;
+
     const versionedPath = cleanEndpoint.match(/^\/(v\d+|auth)(\/|$)/)
       ? cleanEndpoint
-      : `/v1${cleanEndpoint}`;
+      : `/${webVersion}${cleanEndpoint}`;
 
     const response = await fetch(`${baseUrl}${versionedPath}`, {
       ...options,

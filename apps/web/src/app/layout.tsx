@@ -6,6 +6,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 
+import { APP_NAME } from "@/lib/config";
+
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -13,8 +15,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Blood Aid - Blood Donor Platform",
-  description: "Connect with blood donors and receivers nearby.",
+  title: `${APP_NAME} - Blood Donor Platform`,
+  description: `Connect with blood donors and receivers nearby on ${APP_NAME}.`,
 };
 
 export default function RootLayout({
@@ -23,10 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className={`${inter.className} min-h-full flex flex-col font-sans`}>
         <QueryProvider>
           <AuthProvider>
@@ -39,5 +38,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-

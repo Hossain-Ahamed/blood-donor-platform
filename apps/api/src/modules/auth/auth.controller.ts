@@ -22,7 +22,7 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
     const data = await this.authService.googleLogin(req);
-    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    const frontendUrl = process.env.CORS_ORIGIN || `${req.protocol}://${req.get('host')}`;
     return res.redirect(`${frontendUrl}/login/success?token=${data.access_token}`);
   }
 }

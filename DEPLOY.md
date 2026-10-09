@@ -9,7 +9,7 @@ This project is fully containerized with Docker Compose and designed to sit secu
 ## 1. Architecture Overview
 
 ### How Ports are Hidden from the Internet
-In [docker-compose.yml](file:///home/hossain/Documents/blood-donor-platform/docker-compose.yml):
+In [docker-compose.yml](./docker-compose.yml):
 - **Web (`3000`)** and **API (`3001`)** are bound **strictly to `127.0.0.1`** (localhost).
 - They are **hidden from the public internet**. No external visitor or firewall scanner can access `http://<server-ip>:3000` or `http://<server-ip>:3001` directly.
 - **PostgreSQL (`5432`)** and **Redis (`6379`)** have **no host ports** published at all. They are strictly isolated inside the `backend` Docker network.
@@ -75,7 +75,9 @@ PORT=3001
 API_PORT=3001
 MIGRATIONS_RUN=true
 JWT_ACCESS_SECRET=your_32char_hex_secret
+JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=your_32char_hex_secret
+JWT_REFRESH_EXPIRES_IN=30d
 CORS_ORIGIN=https://bloodaid.scripthorizon.tech
 
 # Google OAuth (Unversioned callback)
@@ -98,7 +100,7 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_vapid_public_key
 
 ## 4. Setup Nginx Reverse Proxy on Host
 
-A production-ready Nginx configuration template is provided in [nginx.conf.example](file:///home/hossain/Documents/blood-donor-platform/nginx.conf.example).
+A production-ready Nginx configuration template is provided in [nginx.conf.example](./nginx.conf.example).
 
 ### Step 1: Copy configuration to Nginx
 ```bash

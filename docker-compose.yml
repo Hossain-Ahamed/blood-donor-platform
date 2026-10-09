@@ -22,12 +22,15 @@ services:
     container_name: blood_redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD environment variable is required}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD environment variable is required}
+      - REDISCLI_AUTH=${REDIS_PASSWORD:?REDIS_PASSWORD environment variable is required}
     volumes:
       - redis_data:/data
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -54,6 +57,7 @@ services:
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:?VAPID_PUBLIC_KEY environment variable is required}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:?VAPID_PRIVATE_KEY environment variable is required}
       - MIGRATIONS_RUN=${MIGRATIONS_RUN:?MIGRATIONS_RUN environment variable is required}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-ahamed.hossain@rpsu.edu.bd}
     ports:
       - "127.0.0.1:${API_PORT:?API_PORT environment variable is required}:3001"
     networks:
@@ -77,6 +81,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL environment variable is required}
+        - NEXT_PUBLIC_API_VERSION=${NEXT_PUBLIC_API_VERSION:-v1}
         - NEXT_PUBLIC_PROJECT_NAME=${NEXT_PUBLIC_PROJECT_NAME:?NEXT_PUBLIC_PROJECT_NAME environment variable is required}
         - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:?NEXT_PUBLIC_VAPID_PUBLIC_KEY environment variable is required}
     container_name: blood_web
@@ -86,6 +91,7 @@ services:
       - PORT=3000
       - INTERNAL_API_URL=http://api:3001
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL environment variable is required}
+      - NEXT_PUBLIC_API_VERSION=${NEXT_PUBLIC_API_VERSION:-v1}
       - NEXT_PUBLIC_PROJECT_NAME=${NEXT_PUBLIC_PROJECT_NAME:?NEXT_PUBLIC_PROJECT_NAME environment variable is required}
       - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:?NEXT_PUBLIC_VAPID_PUBLIC_KEY environment variable is required}
     ports:

@@ -264,7 +264,7 @@ export function AdminRequestDetailDialog({
               className="text-xs"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1" />
-              Delete
+              Delete Permanently
             </Button>
 
             {request.status !== "OPEN" && (
@@ -273,10 +273,10 @@ export function AdminRequestDetailDialog({
                 size="sm"
                 onClick={() => onUpdateStatus(RequestStatus.OPEN)}
                 disabled={actionLoading}
-                className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300"
+                className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 font-medium"
               >
                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                Approve / Open
+                Reopen Request
               </Button>
             )}
 
@@ -286,23 +286,23 @@ export function AdminRequestDetailDialog({
                 size="sm"
                 onClick={() => onUpdateStatus(RequestStatus.FULFILLED)}
                 disabled={actionLoading}
-                className="text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300"
+                className="text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 font-medium"
               >
                 <Check className="w-3.5 h-3.5 mr-1" />
-                Mark Fulfilled
+                Mark as Fulfilled
               </Button>
             )}
 
             {request.status !== "CANCELLED" && (
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={() => onUpdateStatus(RequestStatus.CANCELLED)}
                 disabled={actionLoading}
-                className="text-xs"
+                className="text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 font-medium"
               >
                 <XCircle className="w-3.5 h-3.5 mr-1" />
-                Reject / Cancel
+                Cancel Request
               </Button>
             )}
           </div>

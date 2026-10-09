@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -16,11 +16,11 @@ export class PushSubscriptionsService {
   ) {
     const vapidPublicKey = this.configService.get<string>("VAPID_PUBLIC_KEY");
     const vapidPrivateKey = this.configService.get<string>("VAPID_PRIVATE_KEY");
+    const adminEmail =
+      this.configService.get<string>("ADMIN_EMAIL") || "ahamed.hossain@rpsu.edu.bd";
 
-    // We use a dummy mailto if the email is not available in the environment,
-    // though typically you should set a real mailto for web-push
     webpush.setVapidDetails(
-      "mailto:admin@example.com",
+      `mailto:${adminEmail}`,
       vapidPublicKey,
       vapidPrivateKey,
     );
@@ -32,11 +32,12 @@ export class PushSubscriptionsService {
   ): Promise<PushSubscription> {
     const { endpoint, keys } = subscription;
 
-    let existing = await this.pushSubscriptionRepository.findOne({
-      where: { user_id: userId, endpoint },
+    const existing = await this.pushSubscriptionRepository.findOne({
+      where: { endpoint },
     });
 
     if (existing) {
+      existing.user_id = userId;
       existing.p256dh = keys.p256dh;
       existing.auth = keys.auth;
       return this.pushSubscriptionRepository.save(existing);
@@ -50,6 +51,14 @@ export class PushSubscriptionsService {
     });
 
     return this.pushSubscriptionRepository.save(newSub);
+  }
+
+  async deleteSubscription(userId: string, endpoint?: string): Promise<void> {
+    if (endpoint) {
+      await this.pushSubscriptionRepository.delete({ user_id: userId, endpoint });
+    } else {
+      await this.pushSubscriptionRepository.delete({ user_id: userId });
+    }
   }
 
   async findSubscriptionsForUsers(
@@ -105,5 +114,94 @@ export class PushSubscriptionsService {
     ).catch((err) => {
       this.logger.error("Error in notifyUsers Promise.all:", err);
     });
+  }
+
+  async sendDirectTest(
+    userId: string,
+    payload: any,
+  ): Promise<{ success: boolean; message: string; details?: any }> {
+    const subscriptions = await this.findSubscriptionsForUsers([userId]);
+    this.logger.log(
+      `Test notification: Found ${subscriptions.length} push subscription(s) for user ${userId}`,
+    );
+
+    if (subscriptions.length === 0) {
+      throw new BadRequestException(
+        "No active push subscription found for this user in the database. Please turn notifications off and back on in your browser.",
+      );
+    }
+
+    const results = [];
+    for (const sub of subscriptions) {
+      const pushSub = {
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: sub.p256dh,
+          auth: sub.auth,
+        },
+      };
+
+      try {
+        const res = await webpush.sendNotification(
+          pushSub,
+          JSON.stringify(payload),
+        );
+        this.logger.log(
+          `Direct test push succeeded with status ${res.statusCode}`,
+        );
+        results.push({
+          endpoint: sub.endpoint.substring(0, 45) + "...",
+          statusCode: res.statusCode,
+          success: true,
+        });
+      } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        const bodyText = typeof err.body === "string" ? err.body.trim() : JSON.stringify(err.body || "");
+        const detail = `[HTTP ${statusCode}] ${bodyText || err.message}`;
+        this.logger.error(`Direct test push failed for user ${userId}: ${detail}`);
+
+        // If subscription is expired or unregistered on Google FCM, delete it immediately
+        if (statusCode === 410 || statusCode === 404) {
+          this.logger.warn(`Cleaning up expired subscription ${sub.id} (status ${statusCode})`);
+          await this.pushSubscriptionRepository.delete(sub.id).catch(() => {});
+        }
+
+        results.push({
+          endpoint: sub.endpoint.substring(0, 45) + "...",
+          statusCode,
+          success: false,
+          error: detail,
+        });
+      }
+    }
+
+    const failed = results.filter((r) => !r.success);
+    if (failed.length === results.length) {
+      const allExpired = failed.every(
+        (f) => f.statusCode === 410 || f.statusCode === 404,
+      );
+      if (allExpired) {
+        throw new BadRequestException(
+          "The push registration token was expired or invalidated by the browser gateway (FCM). The dead subscription has been cleared. Please turn notifications off and back on in your browser to generate a fresh token.",
+        );
+      }
+
+      const anyAuth = failed.some((f) => f.statusCode === 401);
+      if (anyAuth) {
+        throw new BadRequestException(
+          "Push gateway rejected VAPID keys (HTTP 401 Unauthorized). Please verify that VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY match NEXT_PUBLIC_VAPID_PUBLIC_KEY.",
+        );
+      }
+
+      throw new BadRequestException(
+        `Push delivery failed by push gateway: ${failed.map((f) => f.error).join("; ")}`,
+      );
+    }
+
+    return {
+      success: true,
+      message: `Test alert dispatched to ${results.filter((r) => r.success).length}/${subscriptions.length} registered device(s)!`,
+      details: results,
+    };
   }
 }

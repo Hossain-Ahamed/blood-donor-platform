@@ -1,19 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function getClientOrigin(request: NextRequest): string {
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const proto =
+    request.headers.get("x-forwarded-proto") ||
+    (request.url.startsWith("https") ? "https" : "http");
+  if (host) {
+    return `${proto}://${host}`;
+  }
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_API_URL).origin;
+    } catch {
+      // ignore
+    }
+  }
+  return request.nextUrl.origin;
+}
+
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
+  const origin = getClientOrigin(request);
 
   if (token) {
-    const isProduction =
-      process.env.NODE_ENV === "production" &&
-      !process.env.NEXT_PUBLIC_API_URL?.includes("localhost");
+    const isHttps =
+      request.url.startsWith("https") ||
+      request.headers.get("x-forwarded-proto") === "https";
+    const isProduction = process.env.NODE_ENV === "production" && isHttps;
 
     const rawRedirect = request.cookies.get("post_login_redirect")?.value;
     const decodedRedirect = rawRedirect ? decodeURIComponent(rawRedirect) : null;
     const targetPath =
       decodedRedirect && decodedRedirect.startsWith("/") ? decodedRedirect : "/browse";
 
-    const response = NextResponse.redirect(new URL(targetPath, request.url));
+    const response = NextResponse.redirect(new URL(targetPath, origin));
     response.cookies.set("access_token", token, {
       httpOnly: true,
       secure: isProduction,
@@ -27,6 +47,5 @@ export async function GET(request: NextRequest) {
     return response;
   }
 
-  return NextResponse.redirect(new URL("/login", request.url));
+  return NextResponse.redirect(new URL("/login", origin));
 }
-

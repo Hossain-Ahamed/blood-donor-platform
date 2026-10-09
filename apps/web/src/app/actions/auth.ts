@@ -10,7 +10,7 @@ export async function setAuthToken(token: string) {
     value: token,
     httpOnly: true,
     path: "/",
-    secure: process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_API_URL?.includes("localhost"),
+    secure: process.env.NODE_ENV === "production" && (process.env.NEXT_PUBLIC_API_URL?.startsWith("https") ?? false),
     maxAge: 60 * 60 * 24 * 30, // 30 days
   });
 }

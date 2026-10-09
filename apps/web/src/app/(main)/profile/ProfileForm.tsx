@@ -49,7 +49,11 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
     isSupported,
     isSubscribed,
     loading: pushLoading,
+    testLoading,
+    permissionState,
     subscribeToPush,
+    unsubscribeFromPush,
+    sendTestNotification,
   } = usePushNotifications();
 
   const rawDob = initialData?.date_of_birth;
@@ -247,7 +251,11 @@ export function ProfileForm({ initialData, initialUser }: ProfileFormProps) {
           isSupported={isSupported}
           pushLoading={pushLoading}
           isSubscribed={isSubscribed}
+          testLoading={testLoading}
+          permissionState={permissionState}
           onSubscribe={subscribeToPush}
+          onUnsubscribe={unsubscribeFromPush}
+          onSendTest={sendTestNotification}
         />
       </div>
     </div>

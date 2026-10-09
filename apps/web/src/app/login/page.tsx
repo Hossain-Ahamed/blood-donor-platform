@@ -12,6 +12,7 @@ import {
 import { LogIn } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { APP_NAME } from "@/lib/config";
 
 export default function LoginPage() {
   const handleGoogleLogin = () => {
@@ -24,12 +25,18 @@ export default function LoginPage() {
     } catch {
       // ignore
     }
-    const API_URL = process.env.NEXT_PUBLIC_API_URL;
-    if (!API_URL) {
-      throw new Error("Missing environment variable: NEXT_PUBLIC_API_URL is required");
+    let authUrl = "/auth/google";
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      try {
+        const parsed = new URL(process.env.NEXT_PUBLIC_API_URL);
+        if (typeof window !== "undefined" && parsed.host !== window.location.host) {
+          authUrl = `${parsed.origin.replace(/\/v1\/?$/, "")}/auth/google`;
+        }
+      } catch {
+        authUrl = "/auth/google";
+      }
     }
-    const authBaseUrl = API_URL.replace(/\/v1\/?$/, "");
-    window.location.href = `${authBaseUrl}/auth/google`;
+    window.location.href = authUrl;
   };
 
   return (
@@ -38,7 +45,7 @@ export default function LoginPage() {
         href="/"
         className="absolute top-4 left-4 md:top-8 md:left-8 font-bold text-xl text-red-600 dark:text-red-500"
       >
-        Blood Aid
+        {APP_NAME}
       </Link>
 
       <Card className="w-full max-w-md border-zinc-200 dark:border-zinc-800 shadow-lg">
@@ -82,7 +89,7 @@ export default function LoginPage() {
           </Button>
         </CardContent>
         <CardFooter className="flex justify-center border-t border-zinc-100 dark:border-zinc-800 pt-6">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+          {/* <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
             By signing in, you agree to our <br />
             <Link
               href="/terms"
@@ -97,8 +104,8 @@ export default function LoginPage() {
             >
               Privacy Policy
             </Link>
-            .
-          </p>
+            . 
+          </p>*/}
         </CardFooter>
       </Card>
     </div>

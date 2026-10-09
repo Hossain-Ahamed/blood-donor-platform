@@ -1,0 +1,35 @@
+# Dependencies
+node_modules
+**/node_modules
+.pnpm-store
+
+# Next.js & Build outputs
+.next
+apps/web/.next
+dist
+apps/api/dist
+packages/shared/dist
+build
+out
+.turbo
+coverage
+
+# Environment & local files
+.env
+.env.local
+.env.*.local
+
+# Git & IDE configs
+.git
+.gitignore
+.vscode
+.idea
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docs & markdown
+*.md
+

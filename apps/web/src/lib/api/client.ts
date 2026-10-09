@@ -101,6 +101,11 @@ export const apiClient = {
       throw new ApiError(response.status, errData);
     }
 
-    return response.json();
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    const text = await response.text();
+    return text ? JSON.parse(text) : ({} as T);
   },
 };

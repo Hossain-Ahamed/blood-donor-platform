@@ -13,6 +13,7 @@ import { User } from '../../entities/user.entity';
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule,
+    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -26,5 +27,4 @@ import { User } from '../../entities/user.entity';
   providers: [AuthService, GoogleStrategy, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
-export class AuthModule { }
-
+export class AuthModule {}
