@@ -6,6 +6,7 @@ import {
   IsDateString,
   Min,
   Max,
+  IsInt,
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
