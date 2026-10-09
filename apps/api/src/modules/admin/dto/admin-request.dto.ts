@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsInt, Min, IsEnum, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { RequestStatus, RequestUrgency } from '@repo/shared';
+import { RequestStatus, UrgencyLevel } from '@repo/shared';
 
 export class AdminQueryRequestsDto {
   @ApiPropertyOptional({ description: 'Page number', default: 1 })
@@ -93,10 +93,10 @@ export class AdminUpdateRequestDto {
   @IsInt()
   units_fulfilled?: number;
 
-  @ApiPropertyOptional({ enum: RequestUrgency, description: 'Urgency level' })
+  @ApiPropertyOptional({ enum: UrgencyLevel, description: 'Urgency level' })
   @IsOptional()
-  @IsEnum(RequestUrgency)
-  urgency?: RequestUrgency;
+  @IsEnum(UrgencyLevel)
+  urgency?: UrgencyLevel;
 
   @ApiPropertyOptional({ description: 'Hospital name', example: 'Dhaka Medical College' })
   @IsOptional()

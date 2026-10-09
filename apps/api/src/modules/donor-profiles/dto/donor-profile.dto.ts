@@ -167,4 +167,3 @@ export class NearbyDonorsQueryDto {
   @IsOptional()
   bloodGroup?: string;
 }
-

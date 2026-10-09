@@ -55,12 +55,12 @@ export class RequestsController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: "List all blood requests with optional status and blood group filters" })
+  @ApiOperation({ summary: "List blood requests with optional status and blood group filters (paginated)" })
   async findAll(@Query() query: QueryRequestsDto) {
     const filters = {};
     if (query.status) filters["status"] = query.status;
     if (query.blood_group) filters["blood_group"] = query.blood_group;
-    return this.requestsService.findAll(filters);
+    return this.requestsService.findAll(filters, query.limit, query.page);
   }
 
   @Public()

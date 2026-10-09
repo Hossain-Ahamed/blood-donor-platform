@@ -26,7 +26,7 @@ export enum ReportResolutionAction {
 }
 
 export class UpdateReportDto {
-  @ApiProperty({ enum: ReportStatus, description: "New report status", example: ReportStatus.RESOLVED })
+  @ApiProperty({ enum: ReportStatus, description: "New report status", example: ReportStatus.ACTIONED })
   @IsEnum(ReportStatus)
   status: ReportStatus;
 

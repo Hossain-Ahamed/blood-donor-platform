@@ -229,10 +229,20 @@ export class RequestsService {
     return request;
   }
 
-  async findAll(filters: any): Promise<BloodRequest[]> {
+  async findAll(
+    filters: any,
+    limit: number = 20,
+    page: number = 1,
+  ): Promise<BloodRequest[]> {
+    const cappedLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+    const pageNum = Math.max(1, Number(page) || 1);
+    const skip = (pageNum - 1) * cappedLimit;
+
     const results = await this.requestRepository.find({
       where: filters,
       order: { created_at: "DESC" },
+      take: cappedLimit,
+      skip,
     });
     return results.map((r) => {
       delete (r as any).contact_phone;
