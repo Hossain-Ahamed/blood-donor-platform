@@ -9,19 +9,21 @@ This project is fully containerized with Docker Compose and designed to sit secu
 ## 1. Architecture Overview
 
 ### How Ports are Hidden from the Internet
+
 In [docker-compose.yml](./docker-compose.yml):
-- **Web (`3000`)** and **API (`3001`)** are bound **strictly to `127.0.0.1`** (localhost).
-- They are **hidden from the public internet**. No external visitor or firewall scanner can access `http://<server-ip>:3000` or `http://<server-ip>:3001` directly.
+
+- **Web (`3334`)** and **API (`3335`)** are bound **strictly to `127.0.0.1`** (localhost).
+- They are **hidden from the public internet**. No external visitor or firewall scanner can access `http://<server-ip>:3334` or `http://<server-ip>:3335` directly.
 - **PostgreSQL (`5432`)** and **Redis (`6379`)** have **no host ports** published at all. They are strictly isolated inside the `backend` Docker network.
 - Inside Docker, the Next.js `web` container talks directly to the NestJS `api` container via `INTERNAL_API_URL=http://api:3001`.
 
 ```mermaid
 flowchart TB
     Public["Public Internet / Users / Mobile Apps"] -->|HTTPS :443| Nginx["Nginx Reverse Proxy (Host)"]
-    
+  
     subgraph "Host Machine (Localhost 127.0.0.1 only)"
-        Nginx -->|"Proxy / (pages)"| Web["Web Container :3000"]
-        Nginx -->|"Proxy /v*, /auth*, /api/docs"| API["API Container :3001"]
+        Nginx -->|"Proxy / (pages)"| Web["Web Container :3334"]
+        Nginx -->|"Proxy /v*, /auth*, /api/docs"| API["API Container :3335"]
     end
 
     subgraph "Docker Internal Network (Not Exposed)"
@@ -37,14 +39,14 @@ flowchart TB
 
 External clients (web browsers, mobile apps, third-party developers, and Swagger) access everything through your single public domain **`https://bloodaid.scripthorizon.tech`**:
 
-| Path | Destination | Description |
-|---|---|---|
-| `https://bloodaid.scripthorizon.tech/` | Next.js Frontend (`:3000`) | Main web platform UI |
-| `https://bloodaid.scripthorizon.tech/auth/google` | NestJS API (`:3001`) | Initiates Google OAuth login |
-| `https://bloodaid.scripthorizon.tech/auth/google/callback` | NestJS API (`:3001`) | Google OAuth callback handler |
-| `https://bloodaid.scripthorizon.tech/v1/...` | NestJS API (`:3001`) | Version 1 API endpoints |
-| `https://bloodaid.scripthorizon.tech/v2/...` | NestJS API (`:3001`) | Future API versions (auto-routed) |
-| `https://bloodaid.scripthorizon.tech/api/docs` | NestJS API (`:3001`) | Swagger API interactive documentation |
+| Path                                                         | Destination                  | Description                           |
+| ------------------------------------------------------------ | ---------------------------- | ------------------------------------- |
+| `https://bloodaid.scripthorizon.tech/`                     | Next.js Frontend (`:3334`) | Main web platform UI                  |
+| `https://bloodaid.scripthorizon.tech/auth/google`          | NestJS API (`:3335`)       | Initiates Google OAuth login          |
+| `https://bloodaid.scripthorizon.tech/auth/google/callback` | NestJS API (`:3335`)       | Google OAuth callback handler         |
+| `https://bloodaid.scripthorizon.tech/v1/...`               | NestJS API (`:3335`)       | Version 1 API endpoints               |
+| `https://bloodaid.scripthorizon.tech/v2/...`               | NestJS API (`:3335`)       | Future API versions (auto-routed)     |
+| `https://bloodaid.scripthorizon.tech/api/docs`             | NestJS API (`:3335`)       | Swagger API interactive documentation |
 
 ---
 
@@ -72,7 +74,7 @@ REDIS_PASSWORD=your_strong_redis_password
 
 # API Service
 PORT=3001
-API_PORT=3001
+API_PORT=3335
 MIGRATIONS_RUN=true
 JWT_ACCESS_SECRET=your_32char_hex_secret
 JWT_ACCESS_EXPIRES_IN=15m
@@ -90,39 +92,56 @@ VAPID_PUBLIC_KEY=your_vapid_public_key
 VAPID_PRIVATE_KEY=your_vapid_private_key
 
 # Frontend Web
-WEB_PORT=3000
+WEB_PORT=3334
 NEXT_PUBLIC_API_URL=https://bloodaid.scripthorizon.tech
 NEXT_PUBLIC_PROJECT_NAME="Blood Aid"
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_vapid_public_key
 ```
 
+> [!IMPORTANT]
+> **Customizing Host Ports (Avoiding Server Port Conflicts):**
+> If ports `3000` or `3001` are already in use by other applications on your host server:
+> - Change `WEB_PORT` (e.g. `WEB_PORT=3334`) and `API_PORT` (e.g. `API_PORT=3335`) in `.env`.
+> - In your Nginx config, change the proxy targets to match (`127.0.0.1:3334` and `127.0.0.1:3335`).
+> - **DO NOT CHANGE `PORT=3001`!** `PORT=3001` is strictly the port *inside* the isolated Docker container. Next.js connects internally to `http://api:3001`, and Docker maps `${API_PORT}` to container port `3001`. Changing `PORT` will cause connection timeouts and `502 Bad Gateway`.
+
 ---
 
 ## 4. Setup Nginx Reverse Proxy on Host
 
-A production-ready Nginx configuration template is provided in [nginx.conf.example](./nginx.conf.example).
+A production-ready Nginx configuration template is provided in [nginx.conf.example](./nginx.conf.example). It includes:
+- Automatic HTTP &rarr; HTTPS redirect (Port 80 to 443)
+- Automatic `www` &rarr; non-`www` redirect
+- `sw.js` cache-busting headers for instant Web Push updates
+- Next.js static asset caching
 
 ### Step 1: Copy configuration to Nginx
+
 ```bash
 sudo cp nginx.conf.example /etc/nginx/sites-available/bloodaid.scripthorizon.tech
 ```
+*(If you changed `WEB_PORT` or `API_PORT`, update the `proxy_pass` port numbers inside this file).*
 
 ### Step 2: Enable the site
+
 ```bash
 sudo ln -s /etc/nginx/sites-available/bloodaid.scripthorizon.tech /etc/nginx/sites-enabled/
 ```
 
 ### Step 3: Test and reload Nginx
+
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
 ### Step 4: Obtain Free SSL Certificate with Certbot
+
 ```bash
-sudo certbot --nginx -d bloodaid.scripthorizon.tech
+sudo certbot --nginx -d bloodaid.scripthorizon.tech -d www.bloodaid.scripthorizon.tech
 ```
-*Certbot will automatically configure HTTPS on port 443 and redirect HTTP (port 80) to HTTPS.*
+
+*Certbot will automatically obtain certificates for both domains, configure HTTPS on port 443, and set up permanent HTTP-to-HTTPS redirects.*
 
 ---
 
@@ -135,24 +154,29 @@ docker compose up -d --build
 ```
 
 ### Verify Running Containers
+
 ```bash
 docker compose ps
 ```
-Both `blood_web` and `blood_api` will be running, bound only to `127.0.0.1:3000` and `127.0.0.1:3001`.
+
+Both `blood_web` and `blood_api` will be running, bound only to `127.0.0.1:3334` and `127.0.0.1:3335`.
 
 ---
 
 ## 6. Database Migrations & First Admin
 
 ### Migrations
+
 When `MIGRATIONS_RUN=true`, database migrations and the PostGIS extension run **automatically on container startup**.
 
 To run migrations manually if ever needed:
+
 ```bash
 docker compose exec api pnpm --filter api migration:run
 ```
 
 ### Bootstrapping First Admin
+
 1. Log in once via Google OAuth at `https://bloodaid.scripthorizon.tech/login`.
 2. Connect to the PostgreSQL database container:
    ```bash
@@ -168,22 +192,26 @@ docker compose exec api pnpm --filter api migration:run
 ## 7. Maintenance Commands
 
 **View logs from all containers:**
+
 ```bash
 docker compose logs -f
 ```
 
 **View API logs specifically:**
+
 ```bash
 docker compose logs -f api
 ```
 
 **Restart a service (e.g. after code update):**
+
 ```bash
 docker compose restart api
 docker compose restart web
 ```
 
 **Stop the stack:**
+
 ```bash
 docker compose down
 ```

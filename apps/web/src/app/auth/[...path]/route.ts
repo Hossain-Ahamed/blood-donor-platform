@@ -35,9 +35,23 @@ async function handleAuthProxy(
   const search = request.nextUrl.search;
   const targetUrl = `${getApiBase()}/auth/${subPath}${search}`;
 
+  const HOP_BY_HOP = [
+    "host",
+    "cookie",
+    "content-length",
+    "connection",
+    "upgrade",
+    "keep-alive",
+    "transfer-encoding",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+  ];
+
   const headers = new Headers();
   request.headers.forEach((value, key) => {
-    if (!["host", "content-length", "connection"].includes(key.toLowerCase())) {
+    if (!HOP_BY_HOP.includes(key.toLowerCase())) {
       headers.set(key, value);
     }
   });

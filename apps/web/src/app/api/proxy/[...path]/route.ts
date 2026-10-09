@@ -51,10 +51,24 @@ async function proxyRequest(
   const cookieStore = await cookies();
   const token = cookieStore.get("access_token")?.value;
 
+  const HOP_BY_HOP = [
+    "host",
+    "cookie",
+    "content-length",
+    "connection",
+    "upgrade",
+    "keep-alive",
+    "transfer-encoding",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+  ];
+
   const headers = new Headers();
   request.headers.forEach((value, key) => {
     // Exclude hop-by-hop or conflicting headers
-    if (!["host", "cookie", "content-length"].includes(key.toLowerCase())) {
+    if (!HOP_BY_HOP.includes(key.toLowerCase())) {
       headers.set(key, value);
     }
   });
