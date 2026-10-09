@@ -128,30 +128,51 @@ export function BrowseClient({
         return;
       }
       setIsLocating(true);
+
+      const onGpsSuccess = (pos: GeolocationPosition) => {
+        setIsLocating(false);
+        const newCoords: [number, number] = [
+          pos.coords.latitude,
+          pos.coords.longitude,
+        ];
+        setCenter(newCoords);
+        setLocationSource("gps");
+        if (notify) toast.success("Switched to your live GPS Location!");
+        fetchRequests(newCoords, radiusKm, bloodGroup, "gps");
+      };
+
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setIsLocating(false);
-          const newCoords: [number, number] = [
-            pos.coords.latitude,
-            pos.coords.longitude,
-          ];
-          setCenter(newCoords);
-          setLocationSource("gps");
-          if (notify) toast.success("Switched to your live GPS Location!");
-          fetchRequests(newCoords, radiusKm, bloodGroup, "gps");
-        },
+        onGpsSuccess,
         (error) => {
-          setIsLocating(false);
-          console.warn("Geolocation lookup failed/denied:", error);
-          if (notify) {
-            toast.error(
-              error.code === error.PERMISSION_DENIED
-                ? "Location permission denied. Please allow location access in your browser."
-                : "Could not retrieve GPS location. Please try again or choose on map.",
-            );
+          if (error.code === error.PERMISSION_DENIED) {
+            setIsLocating(false);
+            if (notify) {
+              const isIos =
+                typeof navigator !== "undefined" &&
+                /iPad|iPhone|iPod/.test(navigator.userAgent);
+              toast.error(
+                isIos
+                  ? "Location access denied. On iPhone, check Settings > Privacy > Location Services."
+                  : "Location permission denied. Please allow location access in your browser.",
+              );
+            }
+            return;
           }
+
+          // Fallback to cellular / Wi-Fi positioning if high-accuracy satellite GPS timed out
+          navigator.geolocation.getCurrentPosition(
+            onGpsSuccess,
+            (fallbackErr) => {
+              setIsLocating(false);
+              console.warn("Geolocation lookup failed:", fallbackErr);
+              if (notify) {
+                toast.error("Could not retrieve GPS location. Please try again or choose on map.");
+              }
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+          );
         },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+        { enableHighAccuracy: true, timeout: 7000, maximumAge: 30000 },
       );
     },
     [bloodGroup, radiusKm, fetchRequests],

@@ -12,6 +12,55 @@ function getApiUrl(): string {
   return url;
 }
 
+// Cache in-flight refresh promises to prevent concurrent refresh calls for the same refresh_token
+const inFlightRefreshes = new Map<
+  string,
+  Promise<{ access_token: string; refresh_token: string } | null>
+>();
+
+async function refreshAuthTokens(
+  baseUrl: string,
+  refreshToken: string,
+): Promise<{ access_token: string; refresh_token: string } | null> {
+  const existing = inFlightRefreshes.get(refreshToken);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(`${baseUrl}/v1/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!res.ok) {
+        return null;
+      }
+
+      const data = await res.json();
+      if (data?.access_token) {
+        return {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error("Token refresh network error:", err);
+      return null;
+    } finally {
+      inFlightRefreshes.delete(refreshToken);
+    }
+  })();
+
+  inFlightRefreshes.set(refreshToken, promise);
+  return promise;
+}
+
 async function proxyRequest(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
@@ -50,6 +99,7 @@ async function proxyRequest(
 
   const cookieStore = await cookies();
   const token = cookieStore.get("access_token")?.value;
+  const refreshToken = cookieStore.get("refresh_token")?.value;
 
   const HOP_BY_HOP = [
     "host",
@@ -94,7 +144,33 @@ async function proxyRequest(
   }
 
   try {
-    const backendRes = await fetch(targetUrl, options);
+    let backendRes = await fetch(targetUrl, options);
+    let newAccessToken: string | null = null;
+    let newRefreshToken: string | null = null;
+    let shouldClearTokens = false;
+
+    const isAuthEndpoint =
+      targetPath.startsWith("/auth") || targetPath.includes("/auth/");
+
+    // If backend returns 401 and we have a refresh token, silently refresh and retry
+    if (backendRes.status === 401 && refreshToken && !isAuthEndpoint) {
+      const refreshed = await refreshAuthTokens(baseUrl, refreshToken);
+      if (refreshed?.access_token) {
+        newAccessToken = refreshed.access_token;
+        newRefreshToken = refreshed.refresh_token;
+
+        const retryHeaders = new Headers(headers);
+        retryHeaders.set("authorization", `Bearer ${newAccessToken}`);
+
+        backendRes = await fetch(targetUrl, {
+          ...options,
+          headers: retryHeaders,
+        });
+      } else {
+        shouldClearTokens = true;
+      }
+    }
+
     const contentType = backendRes.headers.get("content-type") || "";
 
     const resHeaders = new Headers();
@@ -103,20 +179,62 @@ async function proxyRequest(
     }
 
     const resBody = await backendRes.text();
-    return new NextResponse(resBody, {
+
+    // If an explicit refresh call was proxied successfully, capture tokens to set cookies
+    if (targetPath.includes("/auth/refresh") && backendRes.ok) {
+      try {
+        const parsed = JSON.parse(resBody);
+        if (parsed?.access_token) {
+          newAccessToken = parsed.access_token;
+          newRefreshToken = parsed.refresh_token;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const response = new NextResponse(resBody, {
       status: backendRes.status,
       statusText: backendRes.statusText,
       headers: resHeaders,
     });
-    // @ts-expect-error
-  } catch (error: never) {
+
+    const isHttps =
+      request.url.startsWith("https") ||
+      request.headers.get("x-forwarded-proto") === "https";
+    const isProduction = process.env.NODE_ENV === "production" && isHttps;
+
+    if (newAccessToken) {
+      response.cookies.set("access_token", newAccessToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+      if (newRefreshToken) {
+        response.cookies.set("refresh_token", newRefreshToken, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 30, // 30 days
+        });
+      }
+    } else if (shouldClearTokens) {
+      response.cookies.delete("access_token");
+      response.cookies.delete("refresh_token");
+    }
+
+    return response;
+  } catch (error: any) {
     return NextResponse.json(
       {
         success: false,
         statusCode: 502,
         error: {
           message: "Failed to connect to backend server",
-          details: error.message,
+          details: error?.message || String(error),
         },
       },
       { status: 502 },

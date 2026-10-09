@@ -2,7 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Bell, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Bell, CheckCircle2, AlertCircle, Share } from "lucide-react";
 
 interface ProfileNotificationsSidebarProps {
   isSupported: boolean;
@@ -26,6 +26,10 @@ export function ProfileNotificationsSidebar({
   onSendTest,
 }: ProfileNotificationsSidebarProps) {
   const isDenied = permissionState === "denied";
+  const isIos =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
   return (
     <Card className="shadow-sm border-zinc-200">
@@ -39,9 +43,27 @@ export function ProfileNotificationsSidebar({
       </CardHeader>
       <CardContent>
         {!isSupported ? (
-          <p className="text-xs text-muted-foreground">
-            Web push notifications are not supported in this browser.
-          </p>
+          isIos ? (
+            <div className="space-y-2 p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900 text-xs">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                iPhone / iPad Setup Required
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Apple restricts Web Push inside Chrome on iOS. To receive emergency alerts on your iPhone:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] text-foreground font-medium pl-0.5">
+                <li>Open this site in <strong>Safari</strong></li>
+                <li>Tap the <strong>Share</strong> button <Share className="inline w-3 h-3 text-muted-foreground mx-0.5" /></li>
+                <li>Tap <strong>&quot;Add to Home Screen&quot;</strong></li>
+                <li>Launch the app from your Home Screen &amp; enable alerts</li>
+              </ol>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Web push notifications are not supported in this browser.
+            </p>
+          )
         ) : pushLoading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />

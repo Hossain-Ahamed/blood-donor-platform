@@ -20,6 +20,7 @@ function getClientOrigin(request: NextRequest): string {
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
+  const refreshToken = request.nextUrl.searchParams.get("refresh_token");
   const origin = getClientOrigin(request);
 
   if (token) {
@@ -41,6 +42,15 @@ export async function GET(request: NextRequest) {
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
+    if (refreshToken) {
+      response.cookies.set("refresh_token", refreshToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+    }
     if (rawRedirect) {
       response.cookies.delete("post_login_redirect");
     }

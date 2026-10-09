@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
+import { Controller, Get, Post, Body, Req, Res, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { Public } from '../../common/decorators/public.decorator';
@@ -23,6 +23,14 @@ export class AuthController {
   async googleAuthRedirect(@Req() req, @Res() res) {
     const data = await this.authService.googleLogin(req);
     const frontendUrl = process.env.CORS_ORIGIN || `${req.protocol}://${req.get('host')}`;
-    return res.redirect(`${frontendUrl}/login/success?token=${data.access_token}`);
+    return res.redirect(
+      `${frontendUrl}/login/success?token=${data.access_token}&refresh_token=${data.refresh_token}`,
+    );
+  }
+
+  @Public()
+  @Post('refresh')
+  async refresh(@Body() body: { refresh_token: string }) {
+    return this.authService.refreshTokens(body?.refresh_token);
   }
 }

@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const token = request.cookies.get("access_token")?.value;
+  const refreshToken = request.cookies.get("refresh_token")?.value;
 
   const isFriendsRoute = pathname.startsWith("/friends");
   const isHistoryRoute = pathname.startsWith("/history");
@@ -19,7 +20,7 @@ export function proxy(request: NextRequest) {
     isAdminRoute ||
     isRequestCreationRoute;
 
-  if (isProtected && !token) {
+  if (isProtected && !token && !refreshToken) {
     const loginUrl = new URL("/login", request.url);
     const redirectTarget = `${pathname}${search}`;
     loginUrl.searchParams.set("redirect", redirectTarget);

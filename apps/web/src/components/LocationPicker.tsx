@@ -106,34 +106,58 @@ export function LocationPicker({
     }
 
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const userLat = pos.coords.latitude;
-        const userLng = pos.coords.longitude;
-        setIsLocating(false);
 
-        onLocationChange(userLat, userLng);
-        const suggested = await reverseGeocode(userLat, userLng);
-        if (suggested) {
-          onLocationChange(userLat, userLng, suggested);
-          if (onAreaNameChange) {
-            onAreaNameChange(suggested);
-          }
+    const onLocationSuccess = async (pos: GeolocationPosition) => {
+      const userLat = pos.coords.latitude;
+      const userLng = pos.coords.longitude;
+      setIsLocating(false);
+
+      onLocationChange(userLat, userLng);
+      const suggested = await reverseGeocode(userLat, userLng);
+      if (suggested) {
+        onLocationChange(userLat, userLng, suggested);
+        if (onAreaNameChange) {
+          onAreaNameChange(suggested);
         }
-        toast.success("Current location detected!");
-      },
+      }
+      toast.success("Current location detected!");
+    };
+
+    // First attempt: High accuracy GPS
+    navigator.geolocation.getCurrentPosition(
+      onLocationSuccess,
       (error) => {
-        setIsLocating(false);
-        console.error("GPS error:", error);
         if (error.code === error.PERMISSION_DENIED) {
-          toast.error(
-            "Location permission denied. Please click on the map to choose location.",
-          );
-        } else {
-          toast.error("Unable to retrieve location. Please click on the map.");
+          setIsLocating(false);
+          const isIos =
+            typeof navigator !== "undefined" &&
+            /iPad|iPhone|iPod/.test(navigator.userAgent);
+          if (isIos) {
+            toast.error(
+              "Location permission denied. On iPhone, open Settings > Privacy > Location Services and allow Chrome / Safari.",
+              { duration: 6000 },
+            );
+          } else {
+            toast.error(
+              "Location permission denied. Please allow location access in your browser or click on the map.",
+            );
+          }
+          return;
         }
+
+        // Common on mobile/iPhone indoors: GPS satellite lock times out, fall back to cellular/Wi-Fi positioning
+        console.warn("High accuracy GPS timed out or unavailable, falling back to network positioning...");
+        navigator.geolocation.getCurrentPosition(
+          onLocationSuccess,
+          (fallbackErr) => {
+            setIsLocating(false);
+            console.error("GPS error fallback:", fallbackErr);
+            toast.error("Unable to retrieve GPS signal. Please tap your location directly on the map.");
+          },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+        );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 7000, maximumAge: 30000 },
     );
   };
 
