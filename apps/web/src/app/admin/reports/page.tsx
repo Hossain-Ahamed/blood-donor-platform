@@ -175,12 +175,13 @@ export default function AdminReportsPage() {
   // Open Review Dialog
   const handleOpenReview = (report: EnrichedReport) => {
     setSelectedReport(report);
-    setReviewStatus(ReportStatus.ACTIONED);
+    const currentStatus = report.status || ReportStatus.PENDING;
+    setReviewStatus(currentStatus);
     setAdminNote("");
     const isSelfTarget =
       report.target_type === ReportTargetType.USER &&
       report.target_id === currentAdmin?.id;
-    setExecuteTargetAction(!isSelfTarget);
+    setExecuteTargetAction(!isSelfTarget && currentStatus === ReportStatus.ACTIONED);
   };
 
   // Mutation: Submit Review / Action
@@ -815,37 +816,65 @@ export default function AdminReportsPage() {
               {/* Status Selector */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold">Resolution Decision</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
-                    onClick={() => setReviewStatus(ReportStatus.ACTIONED)}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
-                      reviewStatus === ReportStatus.ACTIONED
-                        ? "border-red-600 bg-red-600 text-white shadow-xs"
+                    onClick={() => {
+                      setReviewStatus(ReportStatus.PENDING);
+                      setExecuteTargetAction(false);
+                    }}
+                    className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                      reviewStatus === ReportStatus.PENDING
+                        ? "border-amber-500 bg-amber-500 text-white shadow-xs"
                         : "border-border hover:bg-muted text-foreground"
                     }`}
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Actioned</span>
+                    <Clock className="w-4 h-4" />
+                    <span>Pending</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setReviewStatus(ReportStatus.REVIEWED)}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                    onClick={() => {
+                      setReviewStatus(ReportStatus.REVIEWED);
+                      setExecuteTargetAction(false);
+                    }}
+                    className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
                       reviewStatus === ReportStatus.REVIEWED
                         ? "border-blue-600 bg-blue-600 text-white shadow-xs"
                         : "border-border hover:bg-muted text-foreground"
                     }`}
                   >
-                    <Clock className="w-4 h-4" />
+                    <CheckCircle2 className="w-4 h-4" />
                     <span>Reviewed</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setReviewStatus(ReportStatus.DISMISSED)}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                    onClick={() => {
+                      setReviewStatus(ReportStatus.ACTIONED);
+                      const isSelfTarget =
+                        selectedReport.target_type === ReportTargetType.USER &&
+                        selectedReport.target_id === currentAdmin?.id;
+                      setExecuteTargetAction(!isSelfTarget);
+                    }}
+                    className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                      reviewStatus === ReportStatus.ACTIONED
+                        ? "border-red-600 bg-red-600 text-white shadow-xs"
+                        : "border-border hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                    <span>Actioned</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewStatus(ReportStatus.DISMISSED);
+                      setExecuteTargetAction(false);
+                    }}
+                    className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
                       reviewStatus === ReportStatus.DISMISSED
                         ? "border-slate-600 bg-slate-600 text-white shadow-xs"
                         : "border-border hover:bg-muted text-foreground"
