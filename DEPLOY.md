@@ -115,12 +115,115 @@ A production-ready Nginx configuration template is provided in [nginx.conf.examp
 - `sw.js` cache-busting headers for instant Web Push updates
 - Next.js static asset caching
 
-### Step 1: Copy configuration to Nginx
+### Step 1: Create Nginx Site Configuration
+
+Create the configuration file at `/etc/nginx/sites-available/bloodaid.scripthorizon.tech`:
 
 ```bash
-sudo cp nginx.conf.example /etc/nginx/sites-available/bloodaid.scripthorizon.tech
+sudo nano /etc/nginx/sites-available/bloodaid.scripthorizon.tech
 ```
-*(If you changed `WEB_PORT` or `API_PORT`, update the `proxy_pass` port numbers inside this file).*
+
+Paste the following configuration:
+
+```nginx
+# 1. Redirect www to non-www (HTTP)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name www.bloodaid.scripthorizon.tech;
+
+    location / {
+        return 301 http://bloodaid.scripthorizon.tech$request_uri;
+    }
+}
+
+# 2. Main Server (Web on port 3334, API on port 3335)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bloodaid.scripthorizon.tech;
+
+    client_max_body_size 20M;
+
+    gzip on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
+
+    # Service Worker (/sw.js) -> Next.js Web (port 3334, NEVER CACHE)
+    location = /sw.js {
+        proxy_pass http://127.0.0.1:3334;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        expires 0;
+    }
+
+    # Next.js Static Assets -> Next.js Web (port 3334, cached)
+    location /_next/static {
+        proxy_pass http://127.0.0.1:3334;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    # Google OAuth & Auth endpoints -> NestJS API (port 3335)
+    location /auth {
+        proxy_pass http://127.0.0.1:3335;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $http_connection;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Versioned API Endpoints (/v1, /v2, etc.) -> NestJS API (port 3335)
+    location ~ ^/v\d+ {
+        proxy_pass http://127.0.0.1:3335;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $http_connection;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Swagger API Documentation -> NestJS API (port 3335)
+    location ~ ^/api/docs {
+        proxy_pass http://127.0.0.1:3335;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Next.js Frontend Website -> Next.js Web (port 3334)
+    location / {
+        proxy_pass http://127.0.0.1:3334;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $http_connection;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+*(If you changed `WEB_PORT` or `API_PORT` in `.env`, update the `3334` and `3335` port numbers accordingly).*
 
 ### Step 2: Enable the site
 
