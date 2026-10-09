@@ -6,29 +6,35 @@ export const runtime = "nodejs";
 // Image metadata
 export const contentType = "image/png";
 
-// Generate dynamic icon sizes for PWA based on query params
+// Generate dynamic icon sizes for Browser Favicon and PWA
 export default function Icon({
   searchParams = {},
 }: {
   searchParams?: { size?: string };
 }) {
-  const size = searchParams?.size ? parseInt(searchParams.size, 10) : 192;
+  const size = searchParams?.size ? parseInt(searchParams.size, 10) : 32;
+  const iconSize = Math.round(size * 0.6);
 
   return new ImageResponse(
     <div
       style={{
-        fontSize: size * 0.5,
-        background: "#e11d48", // rose-600
         width: "100%",
         height: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "white",
-        borderRadius: "20%",
+        background: "#dc2626", // brand red-600
+        borderRadius: size > 48 ? "24%" : "20%",
       }}
     >
-      R
+      <svg
+        width={iconSize}
+        height={iconSize}
+        viewBox="0 0 24 24"
+        fill="white"
+      >
+        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+      </svg>
     </div>,
     {
       width: size,

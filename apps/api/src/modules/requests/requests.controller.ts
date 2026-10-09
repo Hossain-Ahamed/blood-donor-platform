@@ -9,7 +9,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiResponse } from "@nestjs/swagger";
 import { RequestsService } from "./requests.service";
 import {
   CreateRequestDto,
@@ -56,6 +56,28 @@ export class RequestsController {
   @Public()
   @Get()
   @ApiOperation({ summary: "List blood requests with optional status and blood group filters (paginated)" })
+  @ApiResponse({
+    status: 200,
+    description: "Paginated list of blood requests with metadata",
+    schema: {
+      type: "object",
+      properties: {
+        data: {
+          type: "array",
+          items: { type: "object" },
+        },
+        meta: {
+          type: "object",
+          properties: {
+            total: { type: "number", example: 42 },
+            page: { type: "number", example: 1 },
+            limit: { type: "number", example: 20 },
+            totalPages: { type: "number", example: 3 },
+          },
+        },
+      },
+    },
+  })
   async findAll(@Query() query: QueryRequestsDto) {
     const filters = {};
     if (query.status) filters["status"] = query.status;

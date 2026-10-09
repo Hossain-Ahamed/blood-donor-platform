@@ -233,18 +233,19 @@ export class RequestsService {
     filters: any,
     limit: number = 20,
     page: number = 1,
-  ): Promise<BloodRequest[]> {
+  ) {
     const cappedLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const pageNum = Math.max(1, Number(page) || 1);
     const skip = (pageNum - 1) * cappedLimit;
 
-    const results = await this.requestRepository.find({
+    const [results, total] = await this.requestRepository.findAndCount({
       where: filters,
       order: { created_at: "DESC" },
       take: cappedLimit,
       skip,
     });
-    return results.map((r) => {
+
+    const data = results.map((r) => {
       delete (r as any).contact_phone;
       if (
         r.location &&
@@ -258,6 +259,16 @@ export class RequestsService {
       }
       return r;
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        page: pageNum,
+        limit: cappedLimit,
+        totalPages: Math.ceil(total / cappedLimit) || 1,
+      },
+    };
   }
 
   async findNearby(query: NearbyQueryDto) {
