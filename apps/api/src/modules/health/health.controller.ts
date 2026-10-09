@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -13,6 +15,9 @@ export class HealthController {
   @Get()
   @Public()
   @HealthCheck()
+  @ApiOperation({ summary: 'Liveness and database health status' })
+  @ApiResponse({ status: 200, description: 'Application and dependencies healthy' })
+  @ApiResponse({ status: 503, description: 'Service degraded or down' })
   check() {
     return this.health.check([
       () => this.db.pingCheck('database'),

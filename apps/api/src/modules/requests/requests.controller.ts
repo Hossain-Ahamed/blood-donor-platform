@@ -9,20 +9,25 @@ import {
   Query,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam } from "@nestjs/swagger";
 import { RequestsService } from "./requests.service";
 import {
   CreateRequestDto,
   UpdateRequestDto,
   NearbyQueryDto,
+  QueryRequestsDto,
 } from "./dto/request.dto";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Public } from "../../common/decorators/public.decorator";
 
+@ApiTags("Requests")
+@ApiBearerAuth()
 @Controller("requests")
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
   @Post()
+  @ApiOperation({ summary: "Create an emergency blood request" })
   @Throttle({
     default: {
       limit: process.env.REQUEST_RATE_LIMIT_MAX
@@ -37,18 +42,21 @@ export class RequestsController {
 
   @Public()
   @Get("nearby")
+  @ApiOperation({ summary: "Find blood requests nearby coordinates within radius" })
   async findNearby(@Query() query: NearbyQueryDto) {
     return this.requestsService.findNearby(query);
   }
 
   @Get("me")
+  @ApiOperation({ summary: "Get current user's blood requests" })
   async findMyRequests(@CurrentUser() user: any) {
     return this.requestsService.findMyRequests(user.id);
   }
 
   @Public()
   @Get()
-  async findAll(@Query() query: any) {
+  @ApiOperation({ summary: "List all blood requests with optional status and blood group filters" })
+  async findAll(@Query() query: QueryRequestsDto) {
     const filters = {};
     if (query.status) filters["status"] = query.status;
     if (query.blood_group) filters["blood_group"] = query.blood_group;
@@ -57,11 +65,15 @@ export class RequestsController {
 
   @Public()
   @Get(":id")
+  @ApiOperation({ summary: "Get single blood request details" })
+  @ApiParam({ name: "id", description: "Request UUID" })
   async findOne(@Param("id") id: string, @CurrentUser() user?: any) {
     return this.requestsService.findOne(id, user);
   }
 
   @Patch(":id")
+  @ApiOperation({ summary: "Update an existing blood request" })
+  @ApiParam({ name: "id", description: "Request UUID" })
   async update(
     @CurrentUser() user: any,
     @Param("id") id: string,
@@ -71,6 +83,8 @@ export class RequestsController {
   }
 
   @Delete(":id")
+  @ApiOperation({ summary: "Delete or cancel a blood request" })
+  @ApiParam({ name: "id", description: "Request UUID" })
   async delete(@CurrentUser() user: any, @Param("id") id: string) {
     return this.requestsService.delete(user.id, user.role, id);
   }
